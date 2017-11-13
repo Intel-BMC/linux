@@ -20,6 +20,13 @@ config ASPEED_LPC_MBOX
 	  Expose the ASPEED LPC MBOX registers found on Aspeed SOCs (AST2400
 	  and AST2500) to userspace.
 
+config ASPEED_LPC_SIO
+	tristate "Aspeed ast2400/2500 HOST LPC SIO support"
+	depends on REGMAP && MFD_SYSCON
+	help
+	  Provides a driver to control the LPC SIO interface on ASPEED platform
+	  through ioctl()s.
+
 config ASPEED_LPC_SNOOP
 	tristate "ASPEED LPC snoop support"
 	select REGMAP
