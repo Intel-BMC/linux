@@ -4,6 +4,7 @@
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 #include <dt-bindings/interrupt-controller/aspeed-scu-ic.h>
 #include <dt-bindings/clock/ast2600-clock.h>
+#include <dt-bindings/gpio/aspeed-gpio.h>
 
 / {
 	model = "Aspeed BMC";
@@ -699,6 +700,19 @@
 				pinctrl-names = "default";
 				pinctrl-0 = <&pinctrl_txd4_default &pinctrl_rxd4_default>;
 				status = "disabled";
+			};
+
+			espi: espi@1e6ee000 {
+				compatible = "aspeed,ast2600-espi-slave";
+				reg = <0x1e6ee000 0x200>;
+				interrupts-extended = <&gic GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+					<&gpio0 ASPEED_GPIO(W, 7) IRQ_TYPE_EDGE_FALLING>;
+				status = "disabled";
+				clocks = <&syscon ASPEED_CLK_GATE_ESPICLK>;
+				resets = <&syscon ASPEED_RESET_ESPI>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_espi_default>,
+					    <&pinctrl_espialt_default>;
 			};
 
 			i2c: bus@1e78a000 {
