@@ -342,6 +342,7 @@
 				clocks = <&syscon ASPEED_CLK_APB>;
 				interrupt-controller;
 				#interrupt-cells = <2>;
+				status = "disabled";
 			};
 
 			sgpio: sgpio@1e780200 {
@@ -438,6 +439,9 @@
 				reg = <0x1e6ee000 0x100>;
 				interrupts = <23>;
 				status = "disabled";
+				clocks = <&syscon ASPEED_CLK_GATE_ESPICLK>;
+				pinctrl-names = "default";
+				pinctrl-0 = <&pinctrl_espi_default>;
 			};
 
 			lpc: lpc@1e789000 {
