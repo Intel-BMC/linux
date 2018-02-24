@@ -423,6 +423,14 @@ config SRAM
 config SRAM_EXEC
 	bool
 
+config ASPEED_ESPI_SLAVE
+	depends on ARCH_ASPEED || COMPILE_TEST
+	depends on REGMAP_MMIO
+	tristate "Aspeed ast2500 eSPI slave device driver"
+	help
+	  Control Aspeed ast2500 eSPI slave controller to handle event
+	  which needs the firmware's processing.
+
 config PCI_ENDPOINT_TEST
 	depends on PCI
 	select CRC32
