@@ -399,6 +399,10 @@
 					status = "disabled";
 				};
 
+				sio_regs: regs {
+					compatible = "aspeed,bmc-misc";
+				};
+
 				lpc_sio: lpc-sio@180 {
 					compatible = "aspeed,ast2400-lpc-sio";
 					reg = <0x180 0x20>;
