@@ -1,0 +1,50 @@
+// SPDX-License-Identifier: GPL-2.0+
+// 128MB flash layout: PFR (active + tmp1/tmp2 + extra)
+//                     image with common RW partition
+
+partitions {
+	compatible = "fixed-partitions";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	u-boot@0 {
+		reg = <0x0 0x80000>;
+		label = "u-boot";
+	};
+
+	pfm@80000 {
+		reg = <0x80000 0x20000>;
+		label = "pfm";
+	};
+
+	u-boot-env@a0000 {
+		reg = <0xa0000 0x20000>;
+		label = "u-boot-env";
+	};
+
+	sofs@c0000 {
+		reg = <0xc0000 0x200000>;
+		label = "sofs";
+	};
+
+	rwfs@2c0000 {
+		reg = <0x2c0000 0x840000>;
+		label = "rwfs";
+	};
+
+	fit-image-a@b00000 {
+		reg = <0xb00000 0x1f00000>;
+		label = "image-a";
+	};
+
+	rc-image@2a00000 {
+		reg = <0x2a00000 0x2000000>;
+		label = "rc-image";
+	};
+
+	image-staging@4a00000 {
+		reg = <0x4a00000 0x3600000>;
+		label = "image-stg";
+	};
+
+};
