@@ -1,0 +1,38 @@
+// SPDX-License-Identifier: GPL-2.0+
+// 64MB flash layout: redundant image with common RW partition
+
+partitions {
+	compatible = "fixed-partitions";
+	#address-cells = <1>;
+	#size-cells = <1>;
+
+	u-boot@0 {
+		reg = <0x0 0x80000>;
+		label = "u-boot";
+	};
+
+	fit-image-a@80000 {
+		reg = <0x80000 0x1b80000>;
+		label = "image-a";
+	};
+
+	sofs@1c00000 {
+		reg = <0x1c00000 0x200000>;
+		label = "sofs";
+	};
+
+	rwfs@1e00000 {
+		reg = <0x1e00000 0x600000>;
+		label = "rwfs";
+	};
+
+	u-boot-env@2400000 {
+		reg = <0x2400000 0x20000>;
+		label = "u-boot-env";
+	};
+
+	fit-image-b@2480000 {
+		reg = <0x2480000 0x1b80000>;
+		label = "image-b";
+	};
+};
