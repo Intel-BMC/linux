@@ -21,6 +21,7 @@ struct mq_msg {
 struct mq_queue {
 	struct bin_attribute	bin;
 	struct kernfs_node	*kn;
+	struct i2c_client	*client;
 
 	spinlock_t		lock; /* spinlock for queue index handling */
 	int			in;
@@ -30,6 +31,21 @@ struct mq_queue {
 	int			truncated; /* drop current if truncated */
 	struct mq_msg		*queue;
 };
+
+static bool dump_debug __read_mostly;
+static int dump_debug_bus_id __read_mostly;
+
+#define I2C_HEX_DUMP(client, buf, len) \
+	do { \
+		if (dump_debug && \
+		    (client)->adapter->nr == dump_debug_bus_id) { \
+			char dump_info[100] = {0,}; \
+			snprintf(dump_info, sizeof(dump_info), \
+				 "bus_id:%d: ", (client)->adapter->nr); \
+			print_hex_dump(KERN_ERR, dump_info, DUMP_PREFIX_NONE, \
+				       16, 1, buf, len, true); \
+		} \
+	} while (0)
 
 static int i2c_slave_mqueue_callback(struct i2c_client *client,
 				     enum i2c_slave_event event, u8 *val)
@@ -101,6 +117,7 @@ static ssize_t i2c_slave_mqueue_bin_read(struct file *filp,
 		if (msg->len <= count) {
 			ret = msg->len;
 			memcpy(buf, msg->buf, ret);
+			I2C_HEX_DUMP(mq->client, buf, ret);
 		} else {
 			ret = -EOVERFLOW; /* Drop this HUGE one. */
 		}
@@ -130,6 +147,8 @@ static int i2c_slave_mqueue_probe(struct i2c_client *client,
 		return -ENOMEM;
 
 	BUILD_BUG_ON(!is_power_of_2(MQ_QUEUE_SIZE));
+
+	mq->client = client;
 
 	buf = devm_kmalloc_array(dev, MQ_QUEUE_SIZE, MQ_MSGBUF_SIZE,
 				 GFP_KERNEL);
@@ -211,6 +230,11 @@ static struct i2c_driver i2c_slave_mqueue_driver = {
 	.id_table	= i2c_slave_mqueue_id,
 };
 module_i2c_driver(i2c_slave_mqueue_driver);
+
+module_param_named(dump_debug, dump_debug, bool, 0644);
+MODULE_PARM_DESC(dump_debug, "debug flag for dump printing");
+module_param_named(dump_debug_bus_id, dump_debug_bus_id, int, 0644);
+MODULE_PARM_DESC(dump_debug_bus_id, "bus id for dump debug printing");
 
 MODULE_LICENSE("GPL v2");
 MODULE_AUTHOR("Haiyue Wang <haiyue.wang@linux.intel.com>");
