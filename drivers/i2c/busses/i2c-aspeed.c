@@ -170,6 +170,21 @@ struct aspeed_i2c_bus {
 #endif /* CONFIG_I2C_SLAVE */
 };
 
+static bool dump_debug __read_mostly;
+static int dump_debug_bus_id __read_mostly;
+
+#define I2C_HEX_DUMP(bus, addr, flags, buf, len) \
+	do { \
+		if (dump_debug && (bus)->adap.nr == dump_debug_bus_id) { \
+			char dump_info[100] = {0,}; \
+			snprintf(dump_info, sizeof(dump_info), \
+				 "bus_id:%d, addr:0x%02x, flags:0x%02x: ", \
+				 (bus)->adap.nr, addr, flags); \
+			print_hex_dump(KERN_ERR, dump_info, DUMP_PREFIX_NONE, \
+				       16, 1, buf, len, true); \
+		} \
+	} while (0)
+
 static int aspeed_i2c_reset(struct aspeed_i2c_bus *bus);
 
 static int aspeed_i2c_recover_bus(struct aspeed_i2c_bus *bus)
@@ -662,6 +677,7 @@ static int aspeed_i2c_master_xfer(struct i2c_adapter *adap,
 {
 	struct aspeed_i2c_bus *bus = i2c_get_adapdata(adap);
 	unsigned long time_left, flags;
+	int i;
 
 	spin_lock_irqsave(&bus->lock, flags);
 	bus->cmd_err = 0;
@@ -711,6 +727,11 @@ static int aspeed_i2c_master_xfer(struct i2c_adapter *adap,
 		spin_unlock_irqrestore(&bus->lock, flags);
 
 		return -ETIMEDOUT;
+	}
+
+	for (i = 0; i < num; i++) {
+		I2C_HEX_DUMP(bus, msgs[i].addr, msgs[i].flags,
+			     msgs[i].buf, msgs[i].len);
 	}
 
 	return bus->master_xfer_result;
@@ -1083,6 +1104,11 @@ static struct platform_driver aspeed_i2c_bus_driver = {
 	},
 };
 module_platform_driver(aspeed_i2c_bus_driver);
+
+module_param_named(dump_debug, dump_debug, bool, 0644);
+MODULE_PARM_DESC(dump_debug, "debug flag for dump printing");
+module_param_named(dump_debug_bus_id, dump_debug_bus_id, int, 0644);
+MODULE_PARM_DESC(dump_debug_bus_id, "bus id for dump debug printing");
 
 MODULE_AUTHOR("Brendan Higgins <brendanhiggins@google.com>");
 MODULE_DESCRIPTION("Aspeed I2C Bus Driver");
