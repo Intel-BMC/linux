@@ -431,6 +431,12 @@ config ASPEED_ESPI_SLAVE
 	  Control Aspeed ast2500 eSPI slave controller to handle event
 	  which needs the firmware's processing.
 
+config ASPEED_UART_ROUTING
+	tristate "Aspeed ast2500 UART routing control"
+	help
+	  If you want to configure UART routing on Aspeed BMC platforms, enable
+	  this option.
+
 config PCI_ENDPOINT_TEST
 	depends on PCI
 	select CRC32
