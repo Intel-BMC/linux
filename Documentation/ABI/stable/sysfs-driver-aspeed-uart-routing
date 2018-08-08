@@ -1,0 +1,14 @@
+What:		/sys/bus/platform/drivers/aspeed-uart-routing/*/io*
+Date:		August 2018
+Contact:	Oskar Senft <osk@google.com>
+Description:	Configures the input source for the specific physical
+		serial I/O port.
+Users:		OpenBMC.  Proposed changes should be mailed to
+		openbmc@lists.ozlabs.org
+
+What:		/sys/bus/platform/drivers/aspeed-uart-routing/*/uart*
+Date:		August 2018
+Contact:	Oskar Senft <osk@google.com>
+Description:	Configures the input source for the specific UART.
+Users:		OpenBMC.  Proposed changes should be mailed to
+		openbmc@lists.ozlabs.org
