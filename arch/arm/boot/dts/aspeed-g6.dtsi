@@ -590,6 +590,12 @@
 					#mbox-cells = <1>;
 					clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
 				};
+
+				uart_routing: uart_routing@9c {
+					compatible = "aspeed,ast2500-uart-routing";
+					reg = <0x9c 0x4>;
+					status = "disabled";
+				};
 			};
 
 			sdc: sdc@1e740000 {
