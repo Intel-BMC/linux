@@ -468,6 +468,12 @@ config NPCM7XX_JTAG_MASTER
 	help
 	  Control PSPI/GPIO to transmit jtag signals to support jtag master function.
 
+config ASPEED_UART_ROUTING
+	tristate "Aspeed ast2500 UART routing control"
+	help
+	  If you want to configure UART routing on Aspeed BMC platforms, enable
+	  this option.
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
