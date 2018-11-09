@@ -62,6 +62,14 @@ config ASPEED_XDMA
 	  SoCs. The XDMA engine can perform PCIe DMA operations between the BMC
 	  and a host processor.
 
+config ASPEED_VGA_SHAREDMEM
+	tristate "Aspeed VGA Shared memory"
+	help
+	  To access VGA shared memory on Aspeed BMC, enable this option.
+	  This driver used by ManagedDataRegionlV2 specification. In the
+	  specification, BIOS will transfer whole SMBIOS table to VGA memory,
+	  and BMC can get the table from VGA memory through this driver.
+
 endmenu
 
 endif
