@@ -1,0 +1,20 @@
+* Aspeed VGA shared memory driver
+
+Aspeed VGA shared memory driver allow user to read data from AST2500
+VGA memory. This driver is required by ManagedDataRegionlV2
+specification. In the spec, BIOS will transfer whole SMBIOS table to
+VGA memroy and BMC get the table from VGA memory. 0penBMC project do
+not allow to use /dev/mem for security concerns. To get the data in
+VGA shared memory in user space, implement this driver only allowed
+user to mmap limited memory area.
+
+Required properties:
+- compatible: "aspeed,ast2500-vga-sharedmem"
+	- aspeed,ast2500-vga-sharedmem: Aspeed AST2500 family
+- reg: Should contain VGA shared memory start address and length
+
+Example:
+vga-shared-memory {
+	compatible = "aspeed,ast2500-vga-sharedmem";
+	reg = <0x9ff00000 0x100000>;
+};
