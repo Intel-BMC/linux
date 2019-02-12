@@ -181,6 +181,15 @@ config PWM_FSL_FTM
 	  To compile this driver as a module, choose M here: the module
 	  will be called pwm-fsl-ftm.
 
+config PWM_FTTMR010
+	tristate "Faraday Technology FTTMR010 timer PWM support"
+	help
+	  Generic PWM framework driver for Faraday Technology FTTMR010 Timer
+	  PWM output
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called pwm-fttmr010
+
 config PWM_HIBVT
 	tristate "HiSilicon BVT PWM support"
 	depends on ARCH_HISI || COMPILE_TEST
