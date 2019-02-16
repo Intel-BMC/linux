@@ -27,6 +27,9 @@ struct i2c_mux_core {
 	int (*select)(struct i2c_mux_core *, u32 chan_id);
 	int (*deselect)(struct i2c_mux_core *, u32 chan_id);
 
+	struct mutex hold_lock; /* mutex for channel holding */
+	struct timer_list hold_timer;
+
 	int num_adapters;
 	int max_adapters;
 	struct i2c_adapter *adapter[];

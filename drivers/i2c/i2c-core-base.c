@@ -1391,6 +1391,26 @@ int i2c_handle_smbus_host_notify(struct i2c_adapter *adap, unsigned short addr)
 }
 EXPORT_SYMBOL_GPL(i2c_handle_smbus_host_notify);
 
+static void i2c_adapter_hold(struct i2c_adapter *adapter, unsigned long timeout)
+{
+	mutex_lock(&adapter->hold_lock);
+	mod_timer(&adapter->hold_timer, jiffies + timeout);
+}
+
+static void i2c_adapter_unhold(struct i2c_adapter *adapter)
+{
+	del_timer_sync(&adapter->hold_timer);
+	mutex_unlock(&adapter->hold_lock);
+}
+
+static void i2c_adapter_hold_timer_callback(struct timer_list *t)
+{
+	struct i2c_adapter *adapter = from_timer(adapter, t, hold_timer);
+
+	del_timer(&adapter->hold_timer);
+	mutex_unlock(&adapter->hold_lock);
+}
+
 static int i2c_register_adapter(struct i2c_adapter *adap)
 {
 	int res = -EINVAL;
@@ -1474,6 +1494,9 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
 	mutex_lock(&core_lock);
 	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
 	mutex_unlock(&core_lock);
+
+	mutex_init(&adap->hold_lock);
+	timer_setup(&adap->hold_timer, i2c_adapter_hold_timer_callback, 0);
 
 	return 0;
 
@@ -1694,6 +1717,8 @@ void i2c_del_adapter(struct i2c_adapter *adap)
 	mutex_lock(&core_lock);
 	idr_remove(&i2c_adapter_idr, adap->nr);
 	mutex_unlock(&core_lock);
+
+	i2c_adapter_unhold(adap);
 
 	/* Clear the device structure in case this adapter is ever going to be
 	   added again */
@@ -2013,7 +2038,9 @@ static int i2c_check_for_quirks(struct i2c_adapter *adap, struct i2c_msg *msgs, 
  */
 int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
+	enum i2c_hold_msg_type hold_msg = I2C_HOLD_MSG_NONE;
 	unsigned long orig_jiffies;
+	unsigned long timeout;
 	int ret, try;
 
 	if (WARN_ON(!msgs || num < 1))
@@ -2025,6 +2052,25 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 
 	if (adap->quirks && i2c_check_for_quirks(adap, msgs, num))
 		return -EOPNOTSUPP;
+
+	/* Do not deliver a mux hold msg to root bus adapter */
+	if (!i2c_parent_is_i2c_adapter(adap)) {
+	    hold_msg = i2c_check_hold_msg(msgs[num - 1].flags,
+					   msgs[num - 1].len,
+					  (u16 *)msgs[num - 1].buf);
+		if (hold_msg == I2C_HOLD_MSG_SET) {
+			timeout = msecs_to_jiffies(*(u16 *)msgs[num - 1].buf);
+			i2c_adapter_hold(adap, timeout);
+
+			if (--num == 0)
+				return 0;
+		} else if (hold_msg == I2C_HOLD_MSG_RESET) {
+			i2c_adapter_unhold(adap);
+			return 0;
+		} else if (hold_msg == I2C_HOLD_MSG_NONE) {
+			mutex_lock(&adap->hold_lock);
+		}
+	}
 
 	/*
 	 * i2c_trace_msg_key gets enabled when tracepoint i2c_transfer gets
@@ -2062,6 +2108,9 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 		trace_i2c_result(adap, num, ret);
 	}
 
+	if (!i2c_parent_is_i2c_adapter(adap) && hold_msg == I2C_HOLD_MSG_NONE)
+		mutex_unlock(&adap->hold_lock);
+
 	return ret;
 }
 EXPORT_SYMBOL(__i2c_transfer);
@@ -2080,6 +2129,7 @@ EXPORT_SYMBOL(__i2c_transfer);
  */
 int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
+	bool do_bus_lock = true;
 	int ret;
 
 	if (!adap->algo->master_xfer) {
@@ -2103,12 +2153,25 @@ int i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	 *    one (discarding status on the second message) or errno
 	 *    (discarding status on the first one).
 	 */
-	ret = __i2c_lock_bus_helper(adap);
-	if (ret)
-		return ret;
+	/*
+	 * Do not lock a bus for delivering an unhold msg to a mux
+	 * adpater. This is just for a single length unhold msg case.
+	 */
+	if (num == 1 && i2c_parent_is_i2c_adapter(adap) &&
+	    i2c_check_hold_msg(msgs[0].flags, msgs[0].len,
+			       (u16 *)msgs[0].buf) ==
+			       I2C_HOLD_MSG_RESET)
+		do_bus_lock = false;
+
+	if (do_bus_lock) {
+		ret = __i2c_lock_bus_helper(adap);
+		if (ret)
+			return ret;
+	}
 
 	ret = __i2c_transfer(adap, msgs, num);
-	i2c_unlock_bus(adap, I2C_LOCK_SEGMENT);
+	if (do_bus_lock)
+		i2c_unlock_bus(adap, I2C_LOCK_SEGMENT);
 
 	return ret;
 }
