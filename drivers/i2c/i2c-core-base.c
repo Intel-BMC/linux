@@ -1418,6 +1418,7 @@ static void i2c_adapter_unhold_work(struct work_struct *work)
 
 static int i2c_register_adapter(struct i2c_adapter *adap)
 {
+	u32 bus_timeout_ms = 0;
 	int res = -EINVAL;
 
 	/* Can't register until after driver model init */
@@ -1445,8 +1446,15 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
 	INIT_LIST_HEAD(&adap->userspace_clients);
 
 	/* Set default timeout to 1 second if not already set */
-	if (adap->timeout == 0)
-		adap->timeout = HZ;
+	if (adap->timeout == 0) {
+		device_property_read_u32(&adap->dev, "bus-timeout-ms",
+					 &bus_timeout_ms);
+		adap->timeout = bus_timeout_ms ?
+					msecs_to_jiffies(bus_timeout_ms) : HZ;
+	}
+
+	/* Set retries count if it has the property setting */
+	device_property_read_u32(&adap->dev, "#retries", &adap->retries);
 
 	/* register soft irqs for Host Notify */
 	res = i2c_setup_host_notify_irq_domain(adap);
