@@ -49,6 +49,15 @@ properties:
     description:
       states that there is another master active on this bus
 
+  bus-timeout-ms:
+    default: 1000
+    description:
+      bus timeout in milliseconds defaults to 1 second when not specified
+
+  #retries:
+    description:
+      Number of retries for master transfer
+
 required:
   - reg
   - compatible
