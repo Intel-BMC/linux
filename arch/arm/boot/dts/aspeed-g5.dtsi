@@ -525,6 +525,7 @@
 					ibt: ibt@c0 {
 						compatible = "aspeed,ast2500-ibt-bmc";
 						reg = <0xc0 0x18>;
+						clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
 						interrupts = <8>;
 						status = "disabled";
 					};
