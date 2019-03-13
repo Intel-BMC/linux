@@ -10,6 +10,8 @@ Required properties:
 	"aspeed,ast2400-ibt-bmc"
 	"aspeed,ast2500-ibt-bmc"
 - reg: physical address and size of the registers
+- clocks: contains a phandle to the syscon node describing the clocks.
+	  There should then be one cell representing the clock to use.
 
 Optional properties:
 
@@ -22,4 +24,5 @@ Example:
 		compatible = "aspeed,ast2400-ibt-bmc";
 		reg = <0x1e789140 0x18>;
 		interrupts = <8>;
+		clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
 	};
