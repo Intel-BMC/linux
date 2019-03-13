@@ -279,8 +279,10 @@ static int aspeed_lpc_ctrl_probe(struct platform_device *pdev)
 
 	lpc_ctrl->clk = devm_clk_get(dev, NULL);
 	if (IS_ERR(lpc_ctrl->clk)) {
-		dev_err(dev, "couldn't get clock\n");
-		return PTR_ERR(lpc_ctrl->clk);
+		rc = PTR_ERR(lpc_ctrl->clk);
+		if (rc != -EPROBE_DEFER)
+			dev_err(dev, "couldn't get clock\n");
+		return rc;
 	}
 	rc = clk_prepare_enable(lpc_ctrl->clk);
 	if (rc) {
@@ -305,6 +307,7 @@ static int aspeed_lpc_ctrl_probe(struct platform_device *pdev)
 
 err:
 	clk_disable_unprepare(lpc_ctrl->clk);
+
 	return rc;
 }
 
