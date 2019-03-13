@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0
-/*
- * Copyright (c) 2015-2018, Intel Corporation.
- */
+// Copyright (c) 2015-2019, Intel Corporation.
 
 #define pr_fmt(fmt) "aspeed-kcs-bmc: " fmt
 
 #include <linux/atomic.h>
+#include <linux/clk.h>
 #include <linux/errno.h>
 #include <linux/interrupt.h>
 #include <linux/io.h>
@@ -64,6 +63,7 @@
 
 struct aspeed_kcs_bmc {
 	struct regmap *map;
+	struct clk    *clk;
 };
 
 
@@ -344,6 +344,7 @@ static struct kcs_bmc *aspeed_kcs_probe_of_v2(struct platform_device *pdev)
 static int aspeed_kcs_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
+	struct aspeed_kcs_bmc *priv;
 	struct kcs_bmc *kcs_bmc;
 	struct device_node *np;
 	int rc;
@@ -361,12 +362,26 @@ static int aspeed_kcs_probe(struct platform_device *pdev)
 	if (IS_ERR(kcs_bmc))
 		return PTR_ERR(kcs_bmc);
 
+	priv = kcs_bmc_priv(kcs_bmc);
+	priv->clk = devm_clk_get(dev, NULL);
+	if (IS_ERR(priv->clk)) {
+		rc = PTR_ERR(priv->clk);
+		if (rc != -EPROBE_DEFER)
+			dev_err(dev, "couldn't get clock\n");
+		return rc;
+	}
+	rc = clk_prepare_enable(priv->clk);
+	if (rc) {
+		dev_err(dev, "couldn't enable clock\n");
+		return rc;
+	}
+
 	kcs_bmc->io_inputb = aspeed_kcs_inb;
 	kcs_bmc->io_outputb = aspeed_kcs_outb;
 
 	rc = aspeed_kcs_config_irq(kcs_bmc, pdev);
 	if (rc)
-		return rc;
+		goto err;
 
 	dev_set_drvdata(dev, kcs_bmc);
 
@@ -375,7 +390,7 @@ static int aspeed_kcs_probe(struct platform_device *pdev)
 	rc = misc_register(&kcs_bmc->miscdev);
 	if (rc) {
 		dev_err(dev, "Unable to register device\n");
-		return rc;
+		goto err;
 	}
 
 	dev_dbg(&pdev->dev,
@@ -384,13 +399,22 @@ static int aspeed_kcs_probe(struct platform_device *pdev)
 		kcs_bmc->ioreg.str);
 
 	return 0;
+
+err:
+	aspeed_kcs_enable_channel(kcs_bmc, false);
+	clk_disable_unprepare(priv->clk);
+
+	return rc;
 }
 
 static int aspeed_kcs_remove(struct platform_device *pdev)
 {
 	struct kcs_bmc *kcs_bmc = dev_get_drvdata(&pdev->dev);
+	struct aspeed_kcs_bmc *priv = kcs_bmc_priv(kcs_bmc);
 
 	misc_deregister(&kcs_bmc->miscdev);
+	aspeed_kcs_enable_channel(kcs_bmc, false);
+	clk_disable_unprepare(priv->clk);
 
 	return 0;
 }
