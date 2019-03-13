@@ -40,6 +40,9 @@ properties:
       - description: ODR register
       - description: STR register
 
+  clocks:
+    minItems: 1
+
   aspeed,lpc-io-reg:
     $ref: '/schemas/types.yaml#/definitions/uint32-array'
     minItems: 1
@@ -74,6 +77,7 @@ properties:
 required:
   - compatible
   - interrupts
+  - clocks
 
 additionalProperties: false
 
@@ -103,4 +107,5 @@ examples:
         aspeed,lpc-io-reg = <0xca2>;
         aspeed,lpc-interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
         interrupts = <8>;
+        clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
     };
