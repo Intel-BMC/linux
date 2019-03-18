@@ -407,7 +407,7 @@ static void f_hidg_req_complete(struct usb_ep *ep, struct usb_request *req)
 	struct f_hidg *hidg = (struct f_hidg *)ep->driver_data;
 	unsigned long flags;
 
-	if (req->status != 0) {
+	if (req->status != 0 && req->status != -ESHUTDOWN) {
 		ERROR(hidg->func.config->cdev,
 			"End Point Request ERROR: %d\n", req->status);
 	}
