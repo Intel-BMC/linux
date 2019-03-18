@@ -317,7 +317,7 @@ static void f_hidg_req_complete(struct usb_ep *ep, struct usb_request *req)
 	struct f_hidg *hidg = (struct f_hidg *)ep->driver_data;
 	unsigned long flags;
 
-	if (req->status != 0) {
+	if (req->status != 0 && req->status != -ESHUTDOWN) {
 		ERROR(hidg->func.config->cdev,
 			"End Point Request ERROR: %d\n", req->status);
 	}
@@ -389,8 +389,10 @@ try_again:
 
 	status = usb_ep_queue(hidg->in_ep, req, GFP_ATOMIC);
 	if (status < 0) {
-		ERROR(hidg->func.config->cdev,
-			"usb_ep_queue error on int endpoint %zd\n", status);
+		if (status != -ESHUTDOWN)
+			ERROR(hidg->func.config->cdev,
+			      "usb_ep_queue error on int endpoint %zd\n",
+			      status);
 		goto release_write_pending;
 	} else {
 		status = count;
