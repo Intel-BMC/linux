@@ -59,6 +59,7 @@
 #define ASPEED_I2CD_SDA_DRIVE_1T_EN			BIT(8)
 #define ASPEED_I2CD_M_SDA_DRIVE_1T_EN			BIT(7)
 #define ASPEED_I2CD_M_HIGH_SPEED_EN			BIT(6)
+#define ASPEED_I2CD_GCALL_EN				BIT(2)
 #define ASPEED_I2CD_SLAVE_EN				BIT(1)
 #define ASPEED_I2CD_MASTER_EN				BIT(0)
 
@@ -84,6 +85,7 @@
 #define ASPEED_I2CD_INTR_RECV_MASK			0xf000ffff
 #define ASPEED_I2CD_INTR_SDA_DL_TIMEOUT			BIT(14)
 #define ASPEED_I2CD_INTR_BUS_RECOVER_DONE		BIT(13)
+#define ASPEED_I2CD_INTR_GCALL_ADDR			BIT(8)
 #define ASPEED_I2CD_INTR_SLAVE_MATCH			BIT(7)
 #define ASPEED_I2CD_INTR_SCL_TIMEOUT			BIT(6)
 #define ASPEED_I2CD_INTR_ABNORMAL			BIT(5)
@@ -168,6 +170,8 @@ enum aspeed_i2c_slave_state {
 	ASPEED_I2C_SLAVE_READ_PROCESSED,
 	ASPEED_I2C_SLAVE_WRITE_REQUESTED,
 	ASPEED_I2C_SLAVE_WRITE_RECEIVED,
+	ASPEED_I2C_SLAVE_GCALL_START,
+	ASPEED_I2C_SLAVE_GCALL_REQUESTED,
 	ASPEED_I2C_SLAVE_STOP,
 };
 
@@ -209,6 +213,8 @@ struct aspeed_i2c_bus {
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
 	struct i2c_client		*slave;
 	enum aspeed_i2c_slave_state	slave_state;
+	/* General call */
+	bool				general_call;
 #endif /* CONFIG_I2C_SLAVE */
 };
 
@@ -424,6 +430,12 @@ static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 		bus->slave_state = ASPEED_I2C_SLAVE_START;
 	}
 
+	/* General call was requested, restart state machine. */
+	if (irq_status & ASPEED_I2CD_INTR_GCALL_ADDR) {
+		irq_handled |= ASPEED_I2CD_INTR_GCALL_ADDR;
+		bus->slave_state = ASPEED_I2C_SLAVE_GCALL_START;
+	}
+
 	/* Slave is not currently active, irq was for someone else. */
 	if (bus->slave_state == ASPEED_I2C_SLAVE_INACTIVE)
 		return irq_handled;
@@ -442,6 +454,21 @@ static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 			else
 				bus->slave_state =
 						ASPEED_I2C_SLAVE_WRITE_REQUESTED;
+		} else if (bus->slave_state == ASPEED_I2C_SLAVE_GCALL_START) {
+			/*
+			 * I2C spec defines the second byte meaning like below.
+			 * 0x06 : Reset and write programmable part of slave
+			 *        address by hardware.
+			 * 0x04 : Write programmable part of slave address by
+			 *        hardware.
+			 * 0x00 : No allowed.
+			 *
+			 * But in OpenBMC, we are going to use this
+			 * 'General call' feature for IPMB message broadcasting
+			 * so it delivers all data as is without any specific
+			 * handling of the second byte.
+			 */
+			bus->slave_state = ASPEED_I2C_SLAVE_GCALL_REQUESTED;
 		}
 		irq_handled |= ASPEED_I2CD_INTR_RX_DONE;
 	}
@@ -488,11 +515,16 @@ static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 		i2c_slave_event(slave, I2C_SLAVE_WRITE_RECEIVED, &value);
 		aspeed_i2c_slave_handle_write_received(bus, &value);
 		break;
+	case ASPEED_I2C_SLAVE_GCALL_REQUESTED:
+		bus->slave_state = ASPEED_I2C_SLAVE_WRITE_RECEIVED;
+		i2c_slave_event(slave, I2C_SLAVE_GCALL_REQUESTED, &value);
+		break;
 	case ASPEED_I2C_SLAVE_STOP:
 		i2c_slave_event(slave, I2C_SLAVE_STOP, &value);
 		bus->slave_state = ASPEED_I2C_SLAVE_INACTIVE;
 		break;
 	case ASPEED_I2C_SLAVE_START:
+	case ASPEED_I2C_SLAVE_GCALL_START:
 		/* Slave was just started. Waiting for the next event. */;
 		break;
 	default:
@@ -1132,6 +1164,8 @@ static void __aspeed_i2c_reg_slave(struct aspeed_i2c_bus *bus, u16 slave_addr)
 	/* Turn on slave mode. */
 	func_ctrl_reg_val = readl(bus->base + ASPEED_I2C_FUN_CTRL_REG);
 	func_ctrl_reg_val |= ASPEED_I2CD_SLAVE_EN;
+	if (bus->general_call)
+		func_ctrl_reg_val |= ASPEED_I2CD_GCALL_EN;
 	writel(func_ctrl_reg_val, bus->base + ASPEED_I2C_FUN_CTRL_REG);
 }
 
@@ -1170,6 +1204,8 @@ static int aspeed_i2c_unreg_slave(struct i2c_client *client)
 	/* Turn off slave mode. */
 	func_ctrl_reg_val = readl(bus->base + ASPEED_I2C_FUN_CTRL_REG);
 	func_ctrl_reg_val &= ~ASPEED_I2CD_SLAVE_EN;
+	if (bus->general_call)
+		func_ctrl_reg_val &= ~ASPEED_I2CD_GCALL_EN;
 	writel(func_ctrl_reg_val, bus->base + ASPEED_I2C_FUN_CTRL_REG);
 
 	bus->slave = NULL;
@@ -1317,6 +1353,9 @@ static int aspeed_i2c_init(struct aspeed_i2c_bus *bus,
 	       bus->base + ASPEED_I2C_FUN_CTRL_REG);
 
 #if IS_ENABLED(CONFIG_I2C_SLAVE)
+	if (of_property_read_bool(pdev->dev.of_node, "general-call"))
+		bus->general_call = true;
+
 	/* If slave has already been registered, re-enable it. */
 	if (bus->slave)
 		__aspeed_i2c_reg_slave(bus, bus->slave->addr);
