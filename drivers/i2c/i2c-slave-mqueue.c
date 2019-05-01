@@ -56,10 +56,12 @@ static int i2c_slave_mqueue_callback(struct i2c_client *client,
 
 	switch (event) {
 	case I2C_SLAVE_WRITE_REQUESTED:
+	case I2C_SLAVE_GCALL_REQUESTED:
 		mq->truncated = 0;
 
 		msg->len = 1;
-		msg->buf[0] = client->addr << 1;
+		msg->buf[0] = event == I2C_SLAVE_GCALL_REQUESTED ?
+			      0 : client->addr << 1;
 		break;
 
 	case I2C_SLAVE_WRITE_RECEIVED:
