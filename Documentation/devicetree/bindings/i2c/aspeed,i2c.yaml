@@ -71,6 +71,11 @@ properties:
         DMA mode. IF both DMA and buffer modes are enabled, DMA mode will be
         selected.
 
+  general-call:
+    type: boolean
+    description:
+      enables general call receiving
+
 required:
   - reg
   - compatible
