@@ -2785,6 +2785,22 @@ static int aspeed_g5_sig_expr_set(struct aspeed_pinmux_data *ctx,
 	return 0;
 }
 
+#define GPIOE1 33
+#define GPIOE3 35
+static void aspeed_g5_gpio_disable_free(struct pinctrl_dev *pctldev,
+			      struct pinctrl_gpio_range *range,
+			      unsigned int offset)
+{
+	/*
+	 * If we're freeing GPIOE1 (33) or GPIOE3 (35) then re-enable the
+	 * pass-through mux setting; otherwise, do nothing.
+	 */
+	if (offset != GPIOE1 && offset != GPIOE3)
+		return;
+
+	aspeed_gpio_disable_free(pctldev, range, offset);
+}
+
 static const struct aspeed_pin_config_map aspeed_g5_pin_config_map[] = {
 	{ PIN_CONFIG_BIAS_PULL_DOWN,  0, 1, BIT_MASK(0)},
 	{ PIN_CONFIG_BIAS_PULL_DOWN, -1, 0, BIT_MASK(0)},
@@ -2820,6 +2836,7 @@ static const struct pinmux_ops aspeed_g5_pinmux_ops = {
 	.get_function_groups = aspeed_pinmux_get_fn_groups,
 	.set_mux = aspeed_pinmux_set_mux,
 	.gpio_request_enable = aspeed_gpio_request_enable,
+	.gpio_disable_free = aspeed_g5_gpio_disable_free,
 	.strict = true,
 };
 
