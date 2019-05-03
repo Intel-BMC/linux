@@ -439,6 +439,59 @@ int aspeed_gpio_request_enable(struct pinctrl_dev *pctldev,
 	return 0;
 }
 
+void aspeed_gpio_disable_free(struct pinctrl_dev *pctldev,
+			      struct pinctrl_gpio_range *range,
+			      unsigned int offset)
+{
+	struct aspeed_pinctrl_data *pdata = pinctrl_dev_get_drvdata(pctldev);
+	const struct aspeed_pin_desc *pdesc = pdata->pins[offset].drv_data;
+	const struct aspeed_sig_expr ***prios, **funcs, *expr;
+	int ret;
+
+	if (!pdesc)
+		return;
+
+	dev_dbg(pctldev->dev,
+		"Freeing pass-through pin %s (%d). Re-enabling pass-through.\n",
+		pdesc->name, offset);
+
+	prios = pdesc->prios;
+
+	if (!prios)
+		return;
+
+	/* Disable any functions of higher priority than GPIO just in case */
+	while ((funcs = *prios)) {
+		if (aspeed_gpio_in_exprs(funcs))
+			break;
+
+		ret = aspeed_disable_sig(&pdata->pinmux, funcs);
+		if (ret)
+			return;
+
+		prios++;
+	}
+
+	if (!funcs) {
+		char *signals = get_defined_signals(pdesc);
+
+		pr_warn("No GPIO signal type found on pin %s (%d). Found: %s\n",
+			pdesc->name, offset, signals);
+		kfree(signals);
+
+		return;
+	}
+
+	/*
+	 * Pass-through should be one priority higher than the GPIO function,
+	 * so decrement our prios and enable that function
+	 */
+	prios--;
+	funcs = *prios;
+	expr = *funcs;
+	aspeed_sig_expr_enable(&pdata->pinmux, expr);
+}
+
 int aspeed_pinctrl_probe(struct platform_device *pdev,
 			 struct pinctrl_desc *pdesc,
 			 struct aspeed_pinctrl_data *pdata)
