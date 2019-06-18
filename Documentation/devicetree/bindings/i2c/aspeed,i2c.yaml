@@ -58,6 +58,19 @@ properties:
     description:
       Number of retries for master transfer
 
+  aspeed,dma-buf-size:
+    $ref: /schemas/types.yaml#/definitions/uint32
+    description:
+      size of DMA buffer (from 2 to 4095 in case of AST2500)
+        Only AST2500/2600 support DMA mode.
+        Limitations on AST2500 - I2C is sharing the DMA H/W with UHCI host
+        controller and MCTP controller. Since those controllers operate with DMA
+        mode only, I2C has to use buffer mode or byte mode instead if one of
+        those controllers is enabled. Also make sure that if SD/eMMC or Port80
+        snoop uses DMA mode instead of PIO or FIFO respectively, I2C can't use
+        DMA mode. IF both DMA and buffer modes are enabled, DMA mode will be
+        selected.
+
 required:
   - reg
   - compatible
