@@ -23,6 +23,16 @@ Optional Properties:
 - bus-timeout-ms: bus timeout in milliseconds defaults to 1 second when not
 		  specified.
 - #retries	: Number of retries for master transfer.
+- aspeed,dma-buf-size	: size of DMA buffer (from 2 to 4095 in case of AST2500)
+			  Only AST2500 supports DMA mode under some limitations:
+			  I2C is sharing the DMA H/W with UHCI host controller
+			  and MCTP controller. Since those controllers operate
+			  with DMA mode only, I2C has to use buffer mode or byte
+			  mode instead if one of those controllers is enabled.
+			  Also make sure that if SD/eMMC or Port80 snoop uses
+			  DMA mode instead of PIO or FIFO respectively, I2C
+			  can't use DMA mode. IF both DMA and buffer modes are
+			  enabled, DMA mode will be selected.
 
 Example:
 
@@ -73,6 +83,21 @@ i2c {
 		resets = <&syscon ASPEED_RESET_I2C>;
 		bus-frequency = <100000>;
 		interrupts = <1>;
+		interrupt-parent = <&i2c_ic>;
+	};
+
+	/* DMA mode transfer enabled */
+	i2c2: i2c-bus@c0 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#interrupt-cells = <1>;
+		reg = <0xc0 0x40>;
+		aspeed,dma-buf-size = <4095>;
+		compatible = "aspeed,ast2500-i2c-bus";
+		clocks = <&syscon ASPEED_CLK_APB>;
+		resets = <&syscon ASPEED_RESET_I2C>;
+		bus-frequency = <100000>;
+		interrupts = <2>;
 		interrupt-parent = <&i2c_ic>;
 	};
 };
