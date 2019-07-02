@@ -160,7 +160,7 @@
  */
 #define M_TACH_MODE 0x02 /* 10b */
 #define M_TACH_UNIT 0x0210
-#define INIT_FAN_CTRL 0xFF
+#define INIT_FAN_CTRL 150 /* 58% */
 
 /* How long we sleep in us while waiting for an RPM result. */
 #define ASPEED_RPM_STATUS_SLEEP_USEC	500
