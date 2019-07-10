@@ -587,6 +587,7 @@
 					reg = <0x200 0x5c>;
 					interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
 					#mbox-cells = <1>;
+					clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
 				};
 			};
 
