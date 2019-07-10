@@ -397,6 +397,15 @@
 					interrupts = <8>;
 					status = "disabled";
 				};
+
+				mbox: mbox@200 {
+					compatible = "aspeed,ast2400-mbox";
+					reg = <0x200 0x5c>;
+					interrupts = <46>;
+					#mbox-cells = <1>;
+					clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
+					status = "disabled";
+				};
 			};
 
 			peci: bus@1e78b000 {
