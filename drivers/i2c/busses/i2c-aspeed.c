@@ -88,6 +88,7 @@
  * status bits.
  */
 #define ASPEED_I2CD_INTR_RECV_MASK			0xf000ffff
+#define ASPEED_I2CD_INTR_SLAVE_ADDR_RECEIVED_PENDING	BIT(30)
 #define ASPEED_I2CD_INTR_SLAVE_INACTIVE_TIMEOUT		BIT(15)
 #define ASPEED_I2CD_INTR_SDA_DL_TIMEOUT			BIT(14)
 #define ASPEED_I2CD_INTR_BUS_RECOVER_DONE		BIT(13)
@@ -468,6 +469,18 @@ static u32 aspeed_i2c_slave_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 
 	dev_dbg(bus->dev, "slave irq status 0x%08x, cmd 0x%08x\n",
 		irq_status, command);
+
+	/*
+	 * If a peer master sends messages too quickly before it processes
+	 * previous slave DMA data handling, this indicator will be set. It's
+	 * just a indicator and driver can't recover this case so just ignore
+	 * it.
+	 */
+	if (unlikely(irq_status &
+		     ASPEED_I2CD_INTR_SLAVE_ADDR_RECEIVED_PENDING)) {
+		dev_dbg(bus->dev, "A slave addr match interrupt is pending.\n");
+		irq_handled |= ASPEED_I2CD_INTR_SLAVE_ADDR_RECEIVED_PENDING;
+	}
 
 	/* Slave was sent something. */
 	if (irq_status & ASPEED_I2CD_INTR_RX_DONE) {
