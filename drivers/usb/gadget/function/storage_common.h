@@ -95,6 +95,32 @@ do {									\
  */
 #define INQUIRY_STRING_LEN ((size_t) (8 + 16 + 4 + 1))
 
+struct fsg_stats_cnt {
+	u64 bytes;
+	u32 count;
+};
+
+struct fsg_stats {
+	struct fsg_stats_cnt read;
+	struct fsg_stats_cnt write;
+};
+
+static inline void fsg_stats_update(struct fsg_stats_cnt *cnt, u64 diff)
+{
+	cnt->count++;
+	cnt->bytes += diff;
+}
+
+static inline void fsg_stats_wr_attempt(struct fsg_stats *stats, u64 b_written)
+{
+	fsg_stats_update(&stats->write, b_written);
+}
+
+static inline void fsg_stats_rd_attempt(struct fsg_stats *stats, u64 b_read)
+{
+	fsg_stats_update(&stats->read, b_read);
+}
+
 struct fsg_lun {
 	struct file	*filp;
 	loff_t		file_length;
@@ -120,6 +146,8 @@ struct fsg_lun {
 	const char	*name;		/* "lun.name" */
 	const char	**name_pfx;	/* "function.name" */
 	char		inquiry_string[INQUIRY_STRING_LEN];
+
+	struct fsg_stats	stats;
 };
 
 static inline bool fsg_lun_is_open(struct fsg_lun *curlun)
@@ -208,6 +236,7 @@ ssize_t fsg_show_file(struct fsg_lun *curlun, struct rw_semaphore *filesem,
 ssize_t fsg_show_inquiry_string(struct fsg_lun *curlun, char *buf);
 ssize_t fsg_show_cdrom(struct fsg_lun *curlun, char *buf);
 ssize_t fsg_show_removable(struct fsg_lun *curlun, char *buf);
+ssize_t fsg_show_stats(struct fsg_lun *curlun, char *buf);
 ssize_t fsg_store_ro(struct fsg_lun *curlun, struct rw_semaphore *filesem,
 		     const char *buf, size_t count);
 ssize_t fsg_store_nofua(struct fsg_lun *curlun, const char *buf, size_t count);

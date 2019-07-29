@@ -371,6 +371,15 @@ ssize_t fsg_show_inquiry_string(struct fsg_lun *curlun, char *buf)
 }
 EXPORT_SYMBOL_GPL(fsg_show_inquiry_string);
 
+ssize_t fsg_show_stats(struct fsg_lun *curlun, char *buf)
+{
+	return sprintf(buf, "read cnt: %u\n" "read sum: %llu\n"
+		       "write cnt: %u\n" "write sum: %llu\n",
+		       curlun->stats.read.count, curlun->stats.read.bytes,
+		       curlun->stats.write.count, curlun->stats.write.bytes);
+}
+EXPORT_SYMBOL_GPL(fsg_show_stats);
+
 /*
  * The caller must hold fsg->filesem for reading when calling this function.
  */
