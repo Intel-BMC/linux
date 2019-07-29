@@ -711,6 +711,8 @@ static int do_read(struct fsg_common *common)
 		amount_left  -= nread;
 		common->residue -= nread;
 
+		fsg_stats_rd_attempt(&curlun->stats, nread);
+
 		/*
 		 * Except at the end of the transfer, nread will be
 		 * equal to the buffer size, which is divisible by the
@@ -907,6 +909,8 @@ static int do_write(struct fsg_common *common)
 		file_offset += nwritten;
 		amount_left_to_write -= nwritten;
 		common->residue -= nwritten;
+
+		fsg_stats_wr_attempt(&curlun->stats, nwritten);
 
 		/* If an error occurred, report it and its position */
 		if (nwritten < amount) {
@@ -3122,6 +3126,13 @@ static ssize_t fsg_lun_opts_inquiry_string_store(struct config_item *item,
 
 CONFIGFS_ATTR(fsg_lun_opts_, inquiry_string);
 
+static ssize_t fsg_lun_opts_stats_show(struct config_item *item, char *page)
+{
+	return fsg_show_stats(to_fsg_lun_opts(item)->lun, page);
+}
+
+CONFIGFS_ATTR_RO(fsg_lun_opts_, stats);
+
 static struct configfs_attribute *fsg_lun_attrs[] = {
 	&fsg_lun_opts_attr_file,
 	&fsg_lun_opts_attr_ro,
@@ -3129,6 +3140,7 @@ static struct configfs_attribute *fsg_lun_attrs[] = {
 	&fsg_lun_opts_attr_cdrom,
 	&fsg_lun_opts_attr_nofua,
 	&fsg_lun_opts_attr_inquiry_string,
+	&fsg_lun_opts_attr_stats,
 	NULL,
 };
 
