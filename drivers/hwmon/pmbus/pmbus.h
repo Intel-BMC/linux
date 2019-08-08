@@ -330,6 +330,7 @@ enum pmbus_fan_mode { percent = 0, rpm };
 #define PB_PIN_OP_WARNING		BIT(0)
 #define PB_IIN_OC_WARNING		BIT(1)
 #define PB_IIN_OC_FAULT			BIT(2)
+#define PB_UNIT_OFF_FOR_INSUF_VIN	BIT(3)
 
 /*
  * STATUS_TEMPERATURE

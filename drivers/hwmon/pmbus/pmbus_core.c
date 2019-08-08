@@ -1180,6 +1180,8 @@ struct pmbus_limit_attr {
 struct pmbus_sensor_attr {
 	u16 reg;			/* sensor register */
 	u16 gbit;			/* generic status bit */
+	u16 gfbit;			/* generic fault status bit */
+	u16 sbbit;			/* beep status bit */
 	u8 nlimit;			/* # of limit registers */
 	enum pmbus_sensor_classes class;/* sensor class */
 	const char *label;		/* sensor label */
@@ -1281,6 +1283,32 @@ static int pmbus_add_sensor_attrs_one(struct i2c_client *client,
 			if (ret)
 				return ret;
 		}
+	}
+	/*
+	 * Add fault attribute if there is a generic fault bit, and if
+	 * the generic status register (word or byte, depending on which global
+	 * bit is set) for this page is accessible.
+	 */
+	if (attr->gfbit) {
+		upper = !!(attr->gfbit & 0xff00); /* need to check STATUS_WORD */
+		if ((!upper || (upper && data->has_status_word)) &&
+		    pmbus_check_status_register(client, page)) {
+			ret = pmbus_add_boolean(data, name, "fault", index,
+						NULL, NULL,
+						page, PMBUS_STATUS_WORD,
+						attr->gfbit);
+			if (ret)
+				return ret;
+		}
+	}
+	/* Add beep attribute if there is a beep status bit. */
+	if (attr->sbbit) {
+		ret = pmbus_add_boolean(data, name, "beep", index,
+					NULL, NULL,
+					page, attr->sreg,
+					attr->sbbit);
+		if (ret)
+			return ret;
 	}
 	return 0;
 }
@@ -1480,6 +1508,8 @@ static const struct pmbus_sensor_attr voltage_attributes[] = {
 		.gbit = PB_STATUS_VIN_UV,
 		.limit = vin_limit_attrs,
 		.nlimit = ARRAY_SIZE(vin_limit_attrs),
+		.gfbit = PB_STATUS_WORD_MFR,
+		.sbbit = PB_UNIT_OFF_FOR_INSUF_VIN,
 	}, {
 		.reg = PMBUS_VIRT_READ_VMON,
 		.class = PSC_VOLTAGE_IN,
