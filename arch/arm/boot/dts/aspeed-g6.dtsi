@@ -29,6 +29,12 @@
 		i2c13 = &i2c13;
 		i2c14 = &i2c14;
 		i2c15 = &i2c15;
+		i3c0 = &i3c0;
+		i3c1 = &i3c1;
+		i3c2 = &i3c2;
+		i3c3 = &i3c3;
+		i3c4 = &i3c4;
+		i3c5 = &i3c5;
 		serial0 = &uart1;
 		serial1 = &uart2;
 		serial2 = &uart3;
@@ -364,11 +370,21 @@
 				status = "disabled";
 			};
 
+			adc: adc@1e6e9000 {
+				compatible = "aspeed,ast2500-adc";
+				reg = <0x1e6e9000 0x100>;
+				clocks = <&syscon ASPEED_CLK_APB2>;
+				interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>;
+				resets = <&syscon ASPEED_RESET_ADC>;
+				#io-channel-cells = <1>;
+				status = "disabled";
+			};
+
 			gpio0: gpio@1e780000 {
 				#gpio-cells = <2>;
 				gpio-controller;
 				compatible = "aspeed,ast2600-gpio";
-				reg = <0x1e780000 0x400>;
+				reg = <0x1e780000 0x200>;
 				interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
 				gpio-ranges = <&pinctrl 0 0 208>;
 				ngpios = <208>;
@@ -381,7 +397,7 @@
 				#gpio-cells = <2>;
 				gpio-controller;
 				compatible = "aspeed,ast2600-gpio";
-				reg = <0x1e780800 0x800>;
+				reg = <0x1e780800 0x200>;
 				interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
 				gpio-ranges = <&pinctrl 0 208 36>;
 				ngpios = <36>;
@@ -466,6 +482,13 @@
 				ranges = <0x0 0x1e78b000 0x100>;
 			};
 
+			i3c: bus@1e7a0000 {
+				compatible = "simple-bus";
+				#address-cells = <1>;
+				#size-cells = <1>;
+				ranges = <0 0x1e7a0000 0x8000>;
+			};
+
 			lpc: lpc@1e789000 {
 				compatible = "aspeed,ast2600-lpc-v2", "simple-mfd", "syscon";
 				reg = <0x1e789000 0x1000>;
@@ -535,6 +558,20 @@
 					reg = <0x140 0x18>;
 					interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
 					status = "disabled";
+				};
+
+				lpc_sio: lpc-sio@180 {
+					compatible = "aspeed,ast2500-lpc-sio";
+					reg = <0x180 0x20>;
+					clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
+					status = "disabled";
+				};
+
+				mbox: mbox@200 {
+					compatible = "aspeed,ast2600-mbox";
+					reg = <0x200 0x5c>;
+					interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
+					#mbox-cells = <1>;
 				};
 			};
 
@@ -936,6 +973,94 @@
 		bus-frequency = <100000>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_i2c16_default>;
+		status = "disabled";
+	};
+};
+
+&i3c {
+	i3c0: i3c0@2000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#interrupt-cells = <1>;
+		reg = <0x2000 0x1000>;
+		compatible = "snps,dw-i3c-master-1.00a";
+		clocks = <&syscon ASPEED_CLK_APB2>;
+		resets = <&syscon ASPEED_RESET_I3C0>;
+		bus-frequency = <100000>;
+		interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
+		status = "disabled";
+	};
+
+	i3c1: i3c1@3000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#interrupt-cells = <1>;
+		reg = <0x3000 0x1000>;
+		compatible = "snps,dw-i3c-master-1.00a";
+		clocks = <&syscon ASPEED_CLK_APB2>;
+		resets = <&syscon ASPEED_RESET_I3C1>;
+		bus-frequency = <100000>;
+		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
+		status = "disabled";
+	};
+
+	i3c2: i3c2@4000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#interrupt-cells = <1>;
+		reg = <0x4000 0x1000>;
+		compatible = "snps,dw-i3c-master-1.00a";
+		clocks = <&syscon ASPEED_CLK_APB2>;
+		resets = <&syscon ASPEED_RESET_I3C2>;
+		bus-frequency = <100000>;
+		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_i3c3_default>;
+		status = "disabled";
+	};
+
+	i3c3: i3c3@5000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#interrupt-cells = <1>;
+		reg = <0x5000 0x1000>;
+		compatible = "snps,dw-i3c-master-1.00a";
+		clocks = <&syscon ASPEED_CLK_APB2>;
+		resets = <&syscon ASPEED_RESET_I3C3>;
+		bus-frequency = <100000>;
+		interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_i3c4_default>;
+		status = "disabled";
+	};
+
+	i3c4: i3c4@6000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#interrupt-cells = <1>;
+		reg = <0x6000 0x1000>;
+		compatible = "snps,dw-i3c-master-1.00a";
+		clocks = <&syscon ASPEED_CLK_APB2>;
+		resets = <&syscon ASPEED_RESET_I3C4>;
+		bus-frequency = <100000>;
+		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_i3c5_default>;
+		status = "disabled";
+	};
+
+	i3c5: i3c5@7000 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		#interrupt-cells = <1>;
+		reg = <0x7000 0x1000>;
+		compatible = "snps,dw-i3c-master-1.00a";
+		clocks = <&syscon ASPEED_CLK_APB2>;
+		resets = <&syscon ASPEED_RESET_I3C5>;
+		bus-frequency = <100000>;
+		interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&pinctrl_i3c6_default>;
 		status = "disabled";
 	};
 };
