@@ -1593,6 +1593,11 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
 
 	bus->dev = &pdev->dev;
 
+	/* Disable bus and clean up any left over interrupt state. */
+	writel(0, bus->base + ASPEED_I2C_FUN_CTRL_REG);
+	writel(0, bus->base + ASPEED_I2C_INTR_CTRL_REG);
+	writel(0xffffffff, bus->base + ASPEED_I2C_INTR_STS_REG);
+
 	parent_clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(parent_clk))
 		return PTR_ERR(parent_clk);
@@ -1635,20 +1640,13 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
 	strlcpy(bus->adap.name, pdev->name, sizeof(bus->adap.name));
 	i2c_set_adapdata(&bus->adap, bus);
 
-	/* Clean up any left over interrupt state. */
-	writel(0, bus->base + ASPEED_I2C_INTR_CTRL_REG);
-	writel(0xffffffff, bus->base + ASPEED_I2C_INTR_STS_REG);
-	/*
-	 * bus.lock does not need to be held because the interrupt handler has
-	 * not been enabled yet.
-	 */
-	ret = aspeed_i2c_init(bus, pdev);
-	if (ret < 0)
-		goto out_free_dma_buf;
-
 	irq = irq_of_parse_and_map(pdev->dev.of_node, 0);
 	ret = devm_request_irq(&pdev->dev, irq, aspeed_i2c_bus_irq,
 			       0, dev_name(&pdev->dev), bus);
+	if (ret < 0)
+		goto out_free_dma_buf;
+
+	ret = aspeed_i2c_init(bus, pdev);
 	if (ret < 0)
 		goto out_free_dma_buf;
 
