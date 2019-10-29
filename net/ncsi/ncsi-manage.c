@@ -134,18 +134,15 @@ static void ncsi_channel_monitor(struct timer_list *t)
 		netdev_err(ndp->ndev.dev, "NCSI Channel %d timed out!\n",
 			   nc->id);
 		ncsi_report_link(ndp, true);
-		ndp->flags |= NCSI_DEV_RESHUFFLE;
 
 		ncsi_stop_channel_monitor(nc);
 
-		ncm = &nc->modes[NCSI_MODE_LINK];
 		spin_lock_irqsave(&nc->lock, flags);
-		nc->state = NCSI_CHANNEL_INVISIBLE;
-		ncm->data[2] &= ~0x1;
+		nc->state = NCSI_CHANNEL_INACTIVE;
 		spin_unlock_irqrestore(&nc->lock, flags);
 
 		spin_lock_irqsave(&ndp->lock, flags);
-		nc->state = NCSI_CHANNEL_ACTIVE;
+		ndp->flags |= NCSI_DEV_RESHUFFLE | NCSI_DEV_RESET;
 		list_add_tail_rcu(&nc->link, &ndp->channel_queue);
 		spin_unlock_irqrestore(&ndp->lock, flags);
 		ncsi_process_next_channel(ndp);
@@ -426,6 +423,7 @@ static void ncsi_request_timeout(struct timer_list *t)
 {
 	struct ncsi_request *nr = from_timer(nr, t, timer);
 	struct ncsi_dev_priv *ndp = nr->ndp;
+	struct ncsi_dev *nd = &ndp->ndev;
 	struct ncsi_cmd_pkt *cmd;
 	struct ncsi_package *np;
 	struct ncsi_channel *nc;
@@ -439,6 +437,16 @@ static void ncsi_request_timeout(struct timer_list *t)
 	if (nr->rsp || !nr->cmd) {
 		spin_unlock_irqrestore(&ndp->lock, flags);
 		return;
+	}
+	if (nd->state == ncsi_dev_state_suspend ||
+	    nd->state == ncsi_dev_state_suspend_select ||
+	    nd->state == ncsi_dev_state_suspend_gls ||
+	    nd->state == ncsi_dev_state_suspend_dcnt ||
+	    nd->state == ncsi_dev_state_suspend_dc ||
+	    nd->state == ncsi_dev_state_suspend_deselect ||
+	    nd->state == ncsi_dev_state_suspend_done) {
+		ndp->flags |= NCSI_DEV_RESET;
+		nd->state = ncsi_dev_state_suspend_done;
 	}
 	spin_unlock_irqrestore(&ndp->lock, flags);
 
