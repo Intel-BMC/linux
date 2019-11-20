@@ -13,11 +13,15 @@ struct aspeed_gfx {
 
 	struct drm_simple_display_pipe	pipe;
 	struct drm_connector		connector;
+	u32				scu_misc_offset;
 };
 #define to_aspeed_gfx(x) container_of(x, struct aspeed_gfx, drm)
 
 int aspeed_gfx_create_pipe(struct drm_device *drm);
 int aspeed_gfx_create_output(struct drm_device *drm);
+
+#define SCU_MISC_AST2500	0x2c /* SCU Misc of AST2500 */
+#define SCU_MISC_AST2600	0xc0 /* SCU Misc1 of AST2600 */
 
 #define CRT_CTRL1		0x60 /* CRT Control I */
 #define CRT_CTRL2		0x64 /* CRT Control II */
