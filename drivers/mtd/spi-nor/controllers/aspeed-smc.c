@@ -21,6 +21,11 @@
 #include <linux/sysfs.h>
 
 #define DEVICE_NAME	"aspeed-smc"
+#define AST2600A0 0x05000303
+#define AST2600A0_MAX_FREQ 50000000
+#define AST2600A0_SAFE_FREQ 40000000
+#define AST_MAX_FREQ 100000000
+#define AST2600_REVISION_ID_SCU 0x1e6e2004
 
 /*
  * The driver only support SPI flash
@@ -543,6 +548,10 @@ static int aspeed_smc_get_io_mode(struct aspeed_smc_chip *chip)
 		return CONTROL_IO_DUAL_DATA;
 	case SNOR_PROTO_1_2_2:
 		return CONTROL_IO_DUAL_ADDR_DATA;
+	case SNOR_PROTO_1_1_4:
+		return CONTROL_IO_QUAD_DATA;
+	case SNOR_PROTO_1_4_4:
+		return CONTROL_IO_QUAD_ADDR_DATA;
 	default:
 		dev_err(chip->nor.dev, "unsupported SPI read mode\n");
 		return -EINVAL;
@@ -574,7 +583,7 @@ static ssize_t aspeed_smc_read_user(struct spi_nor *nor, loff_t from,
 		aspeed_smc_write_to_ahb(chip->ahb_base, &dummy, sizeof(dummy));
 
 	/* Set IO mode only for data */
-	if (io_mode == CONTROL_IO_DUAL_DATA)
+	if (io_mode == CONTROL_IO_DUAL_DATA || io_mode == CONTROL_IO_QUAD_DATA)
 		aspeed_smc_set_io_mode(chip, io_mode);
 
 	aspeed_smc_read_from_ahb(read_buf, chip->ahb_base, len);
@@ -1223,6 +1232,25 @@ static int aspeed_smc_chip_setup_finish(struct aspeed_smc_chip *chip)
 	return 0;
 }
 
+static void aspeed_allowed_max_freq(struct aspeed_smc_chip *chip)
+{
+	void __iomem *scu_ast_revision_id = ioremap(AST2600_REVISION_ID_SCU, 4);
+	u32 rev_id = readl(scu_ast_revision_id);
+
+	/*Limit max spi frequency less than 50MHz on AST2600-A0 due
+	 * to FWSPICLK  signal quality issue.
+	 */
+	if(rev_id == AST2600A0 && chip->clk_rate > AST2600A0_MAX_FREQ)
+		chip->clk_rate = AST2600A0_MAX_FREQ;
+}
+
+static u32 get_hwcaps(unsigned int tx_width){
+	if(tx_width == 4)
+		return SNOR_HWCAPS_READ_1_1_4;
+	else
+		return SNOR_HWCAPS_READ_1_1_2;
+}
+
 static const struct spi_nor_controller_ops aspeed_smc_controller_ops = {
 	.prepare = aspeed_smc_prep,
 	.unprepare = aspeed_smc_unprep,
@@ -1235,17 +1263,13 @@ static const struct spi_nor_controller_ops aspeed_smc_controller_ops = {
 static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 				  struct device_node *np, struct resource *r)
 {
-	const struct spi_nor_hwcaps hwcaps = {
-		.mask = SNOR_HWCAPS_READ |
-			SNOR_HWCAPS_READ_FAST |
-			SNOR_HWCAPS_READ_1_1_2 |
-			SNOR_HWCAPS_PP,
-	};
+	struct spi_nor_hwcaps hwcaps;
 	const struct aspeed_smc_info *info = controller->info;
 	struct device *dev = controller->dev;
 	struct device_node *child;
 	unsigned int cs;
 	int ret = -ENODEV;
+	unsigned int spi_tx_width;
 
 	for_each_available_child_of_node(np, child) {
 		struct aspeed_smc_chip *chip;
@@ -1286,9 +1310,20 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 					 &chip->clk_rate)) {
 			chip->clk_rate = ASPEED_SPI_DEFAULT_FREQ;
 		}
+		aspeed_allowed_max_freq(chip);
 		dev_info(dev, "Using %d MHz SPI frequency\n",
 			 chip->clk_rate / 1000000);
 
+		if (of_property_read_u32(child, "spi-tx-bus-width",
+					 &spi_tx_width)) {
+			spi_tx_width = 2;
+		}
+		dev_info(dev, "tx width: %ld\n", spi_tx_width);
+
+		hwcaps.mask = SNOR_HWCAPS_READ |
+					SNOR_HWCAPS_READ_FAST |
+					get_hwcaps(spi_tx_width) |
+					SNOR_HWCAPS_PP;
 		chip->controller = controller;
 		chip->ctl = controller->regs + info->ctl0 + cs * 4;
 		chip->cs = cs;
