@@ -15,7 +15,7 @@
 
 #include "clk-aspeed.h"
 
-#define ASPEED_G6_NUM_CLKS		71
+#define ASPEED_G6_NUM_CLKS		ASPEED_CLK_MAX
 
 #define ASPEED_G6_SILICON_REV		0x014
 #define CHIP_REVISION_ID			GENMASK(23, 16)
@@ -43,6 +43,9 @@
 
 #define ASPEED_MAC12_CLK_DLY		0x340
 #define ASPEED_MAC34_CLK_DLY		0x350
+
+#define ASPEED_G6_GEN_UART_REF		0x338
+#define UART_192MHZ_R_N_VALUE		0x3c38e
 
 /* Globally visible clocks */
 static DEFINE_SPINLOCK(aspeed_g6_clk_lock);
@@ -77,7 +80,7 @@ static const struct aspeed_gate_data aspeed_g6_gates[] = {
 	/* Reserved 11/12 */
 	[ASPEED_CLK_GATE_YCLK]		= { 13,  4, "yclk-gate",	NULL,	 0 },	/* HAC */
 	[ASPEED_CLK_GATE_USBPORT1CLK]	= { 14, 14, "usb-port1-gate",	NULL,	 0 },	/* USB2 hub/USB2 host port 1/USB1.1 dev */
-	[ASPEED_CLK_GATE_UART5CLK]	= { 15, -1, "uart5clk-gate",	"uart",	 0 },	/* UART5 */
+	[ASPEED_CLK_GATE_UART5CLK]	= { 15, -1, "uart5clk-gate",	"uart5",	 0 },	/* UART5 */
 	/* Reserved 16/19 */
 	[ASPEED_CLK_GATE_MAC1CLK]	= { 20, 11, "mac1clk-gate",	"mac12", 0 },	/* MAC1 */
 	[ASPEED_CLK_GATE_MAC2CLK]	= { 21, 12, "mac2clk-gate",	"mac12", 0 },	/* MAC2 */
@@ -471,16 +474,25 @@ static int aspeed_g6_clk_probe(struct platform_device *pdev)
 		return ret;
 	}
 
-	/* UART clock div13 setting */
-	regmap_read(map, ASPEED_G6_MISC_CTRL, &val);
-	if (val & UART_DIV13_EN)
-		rate = 24000000 / 13;
+	/* UART clock setting */
+	regmap_read(map, ASPEED_G6_GEN_UART_REF, &val);
+	if (val == UART_192MHZ_R_N_VALUE){
+		rate = 192000000 / 13;
+		dev_err(dev, "192Mhz baud rate 921600\n");
+	}
 	else
-		rate = 24000000;
+		rate = 24000000 / 13;
 	hw = clk_hw_register_fixed_rate(dev, "uart", NULL, 0, rate);
 	if (IS_ERR(hw))
 		return PTR_ERR(hw);
 	aspeed_g6_clk_data->hws[ASPEED_CLK_UART] = hw;
+
+	/* UART5 clock setting */
+	rate = 24000000 / 13;
+	hw = clk_hw_register_fixed_rate(dev, "uart5", NULL, 0, rate);
+	if (IS_ERR(hw))
+		return PTR_ERR(hw);
+	aspeed_g6_clk_data->hws[ASPEED_CLK_UART5] = hw;
 
 	/* UART6~13 clock div13 setting */
 	regmap_read(map, 0x80, &val);
