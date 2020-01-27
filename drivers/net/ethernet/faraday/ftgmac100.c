@@ -1226,10 +1226,30 @@ static int ftgmac100_set_pauseparam(struct net_device *netdev,
 	return 0;
 }
 
+int ftgmac100_ethtool_get_link_ksettings(struct net_device *netdev,
+					 struct ethtool_link_ksettings *cmd)
+{
+	struct phy_device *phydev = netdev->phydev;
+	struct ftgmac100 *priv = netdev_priv(netdev);
+	int retval = 0;
+
+	if (phydev) {
+		phy_ethtool_ksettings_get(phydev, cmd);
+	} else if (priv->use_ncsi) {
+		cmd->base.speed = priv->cur_speed;
+		cmd->base.duplex = priv->cur_duplex;
+		cmd->base.autoneg = 0;
+	} else {
+		retval = -ENODEV;
+	}
+
+	return retval;
+}
+
 static const struct ethtool_ops ftgmac100_ethtool_ops = {
 	.get_drvinfo		= ftgmac100_get_drvinfo,
 	.get_link		= ethtool_op_get_link,
-	.get_link_ksettings	= phy_ethtool_get_link_ksettings,
+	.get_link_ksettings	= ftgmac100_ethtool_get_link_ksettings,
 	.set_link_ksettings	= phy_ethtool_set_link_ksettings,
 	.nway_reset		= phy_ethtool_nway_reset,
 	.get_ringparam		= ftgmac100_get_ringparam,
