@@ -328,8 +328,12 @@ static int ipmb_probe(struct i2c_client *client,
 	if (ret)
 		return ret;
 
+#if 1 /* FIXME: Quick fix. Need to add parsing code for ipmb_id instead */
+	ipmb_dev->is_i2c_protocol = true;
+#else
 	ipmb_dev->is_i2c_protocol
 		= device_property_read_bool(&client->dev, "i2c-protocol");
+#endif
 
 	ipmb_dev->client = client;
 	i2c_set_clientdata(client, ipmb_dev);
