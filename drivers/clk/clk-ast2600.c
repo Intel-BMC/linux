@@ -32,6 +32,24 @@
 #define ASPEED_G6_CLK_SELECTION1	0x300
 #define ASPEED_G6_CLK_SELECTION2	0x304
 #define ASPEED_G6_CLK_SELECTION4	0x310
+#define ASPEED_G6_CLK_SELECTION5	0x314
+
+#define ASPEED_G6_MAC12_CLK_CTRL0	0x340
+#define ASPEED_G6_MAC12_CLK_CTRL1	0x348
+#define ASPEED_G6_MAC12_CLK_CTRL2	0x34C
+
+#define ASPEED_G6_MAC34_CLK_CTRL0	0x350
+#define ASPEED_G6_MAC34_CLK_CTRL1	0x358
+#define ASPEED_G6_MAC34_CLK_CTRL2	0x35C
+
+#define ASPEED_G6_MAC34_DRIVING_CTRL	0x458
+
+#define ASPEED_G6_DEF_MAC12_DELAY_1G	0x0041b410
+#define ASPEED_G6_DEF_MAC12_DELAY_100M	0x00417410
+#define ASPEED_G6_DEF_MAC12_DELAY_10M	0x00417410
+#define ASPEED_G6_DEF_MAC34_DELAY_1G	0x00104208
+#define ASPEED_G6_DEF_MAC34_DELAY_100M	0x00104208
+#define ASPEED_G6_DEF_MAC34_DELAY_10M	0x00104208
 
 #define ASPEED_HPLL_PARAM		0x200
 #define ASPEED_APLL_PARAM		0x210
@@ -40,9 +58,6 @@
 #define ASPEED_DPLL_PARAM		0x260
 
 #define ASPEED_G6_STRAP1		0x500
-
-#define ASPEED_MAC12_CLK_DLY		0x340
-#define ASPEED_MAC34_CLK_DLY		0x350
 
 #define ASPEED_G6_GEN_UART_REF		0x338
 #define UART_192MHZ_R_N_VALUE		0x3c38e
@@ -565,7 +580,7 @@ static int aspeed_g6_clk_probe(struct platform_device *pdev)
 
 	/* RMII1 50MHz (RCLK) output enable */
 	hw = clk_hw_register_gate(dev, "mac1rclk", "mac12rclk", 0,
-			scu_g6_base + ASPEED_MAC12_CLK_DLY, 29, 0,
+			scu_g6_base + ASPEED_G6_MAC12_CLK_CTRL0, 29, 0,
 			&aspeed_g6_clk_lock);
 	if (IS_ERR(hw))
 		return PTR_ERR(hw);
@@ -573,7 +588,7 @@ static int aspeed_g6_clk_probe(struct platform_device *pdev)
 
 	/* RMII2 50MHz (RCLK) output enable */
 	hw = clk_hw_register_gate(dev, "mac2rclk", "mac12rclk", 0,
-			scu_g6_base + ASPEED_MAC12_CLK_DLY, 30, 0,
+			scu_g6_base + ASPEED_G6_MAC12_CLK_CTRL0, 30, 0,
 			&aspeed_g6_clk_lock);
 	if (IS_ERR(hw))
 		return PTR_ERR(hw);
@@ -595,7 +610,7 @@ static int aspeed_g6_clk_probe(struct platform_device *pdev)
 
 	/* RMII3 50MHz (RCLK) output enable */
 	hw = clk_hw_register_gate(dev, "mac3rclk", "mac34rclk", 0,
-			scu_g6_base + ASPEED_MAC34_CLK_DLY, 29, 0,
+			scu_g6_base + ASPEED_G6_MAC34_CLK_CTRL0, 29, 0,
 			&aspeed_g6_clk_lock);
 	if (IS_ERR(hw))
 		return PTR_ERR(hw);
@@ -603,7 +618,7 @@ static int aspeed_g6_clk_probe(struct platform_device *pdev)
 
 	/* RMII4 50MHz (RCLK) output enable */
 	hw = clk_hw_register_gate(dev, "mac4rclk", "mac34rclk", 0,
-			scu_g6_base + ASPEED_MAC34_CLK_DLY, 30, 0,
+			scu_g6_base + ASPEED_G6_MAC34_CLK_CTRL0, 30, 0,
 			&aspeed_g6_clk_lock);
 	if (IS_ERR(hw))
 		return PTR_ERR(hw);
@@ -819,6 +834,37 @@ static void __init aspeed_g6_cc_init(struct device_node *np)
 		pr_err("no syscon regmap\n");
 		return;
 	}
+
+	/* fixed settings for RGMII/RMII clock generator */
+	/* MAC1/2 RGMII 125MHz = EPLL / 8 */
+	regmap_update_bits(map, ASPEED_G6_CLK_SELECTION2, GENMASK(23, 20),
+			   (0x7 << 20));
+
+	/* MAC3/4 RMII 50MHz = HCLK / 4 */
+	regmap_update_bits(map, ASPEED_G6_CLK_SELECTION4, GENMASK(18, 16),
+			   (0x3 << 16));
+
+	/*
+	 * BIT[31]: MAC1/2 RGMII 125M source = internal PLL
+	 * BIT[28]: RGMIICK pad direction = output
+	 */
+	regmap_write(map, ASPEED_G6_MAC12_CLK_CTRL0,
+		     BIT(31) | BIT(28) | ASPEED_G6_DEF_MAC12_DELAY_1G);
+	regmap_write(map, ASPEED_G6_MAC12_CLK_CTRL1,
+		     ASPEED_G6_DEF_MAC12_DELAY_100M);
+	regmap_write(map, ASPEED_G6_MAC12_CLK_CTRL2,
+		     ASPEED_G6_DEF_MAC12_DELAY_10M);
+
+	/* MAC3/4 RGMII 125M source = RGMIICK pad */
+	regmap_write(map, ASPEED_G6_MAC34_CLK_CTRL0,
+		     ASPEED_G6_DEF_MAC34_DELAY_1G);
+	regmap_write(map, ASPEED_G6_MAC34_CLK_CTRL1,
+		     ASPEED_G6_DEF_MAC34_DELAY_100M);
+	regmap_write(map, ASPEED_G6_MAC34_CLK_CTRL2,
+		     ASPEED_G6_DEF_MAC34_DELAY_10M);
+
+	/* MAC3/4 default pad driving strength */
+	regmap_write(map, ASPEED_G6_MAC34_DRIVING_CTRL, 0x0000000a);
 
 	aspeed_g6_cc(map);
 	aspeed_g6_clk_data->num = ASPEED_G6_NUM_CLKS;
