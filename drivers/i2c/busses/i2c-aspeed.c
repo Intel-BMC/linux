@@ -897,6 +897,9 @@ static u32 aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 		if (bus->master_state != ASPEED_I2C_MASTER_INACTIVE) {
 			bus->cmd_err = ret;
 			bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
+			if (ret == -EAGAIN)
+				irq_handled |= (irq_status &
+						ASPEED_I2CD_INTR_TX_ACK);
 			goto out_complete;
 		}
 	}
