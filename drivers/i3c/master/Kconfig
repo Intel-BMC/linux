@@ -43,3 +43,8 @@ config MIPI_I3C_HCI
 
 	  This driver can also be built as a module.  If so, the module will be
 	  called mipi-i3c-hci.
+
+config ASPEED_I3C_GLOBAL
+       tristate "ASPEED I3C global driver"
+       depends on I3C
+       depends on MACH_ASPEED_G6
