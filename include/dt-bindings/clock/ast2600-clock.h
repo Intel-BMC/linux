@@ -88,7 +88,8 @@
 #define ASPEED_CLK_MAC3RCLK		69
 #define ASPEED_CLK_MAC4RCLK		70
 #define ASPEED_CLK_UART5		71
-#define ASPEED_CLK_MAX			72
+#define ASPEED_CLK_I3C			72
+#define ASPEED_CLK_MAX			73
 
 /* Only list resets here that are not part of a gate */
 #define ASPEED_RESET_ADC		55
