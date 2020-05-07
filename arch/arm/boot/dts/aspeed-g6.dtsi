@@ -1069,13 +1069,20 @@
 };
 
 &i3c {
+	i3cglobal: i3cg@0 {
+		reg = <0x0 0x1000>;
+		compatible = "aspeed,ast2600-i3c-global";
+		resets = <&syscon ASPEED_RESET_I3C_DMA>;
+		status = "disabled";
+	};
+
 	i3c0: i3c0@2000 {
 		#address-cells = <1>;
 		#size-cells = <0>;
 		#interrupt-cells = <1>;
 		reg = <0x2000 0x1000>;
 		compatible = "snps,dw-i3c-master-1.00a";
-		clocks = <&syscon ASPEED_CLK_APB2>;
+		clocks = <&syscon ASPEED_CLK_GATE_I3C0CLK>;
 		resets = <&syscon ASPEED_RESET_I3C0>;
 		bus-frequency = <100000>;
 		interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
@@ -1088,7 +1095,7 @@
 		#interrupt-cells = <1>;
 		reg = <0x3000 0x1000>;
 		compatible = "snps,dw-i3c-master-1.00a";
-		clocks = <&syscon ASPEED_CLK_APB2>;
+		clocks = <&syscon ASPEED_CLK_GATE_I3C1CLK>;
 		resets = <&syscon ASPEED_RESET_I3C1>;
 		bus-frequency = <100000>;
 		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
@@ -1101,7 +1108,7 @@
 		#interrupt-cells = <1>;
 		reg = <0x4000 0x1000>;
 		compatible = "snps,dw-i3c-master-1.00a";
-		clocks = <&syscon ASPEED_CLK_APB2>;
+		clocks = <&syscon ASPEED_CLK_GATE_I3C2CLK>;
 		resets = <&syscon ASPEED_RESET_I3C2>;
 		bus-frequency = <100000>;
 		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
@@ -1116,7 +1123,7 @@
 		#interrupt-cells = <1>;
 		reg = <0x5000 0x1000>;
 		compatible = "snps,dw-i3c-master-1.00a";
-		clocks = <&syscon ASPEED_CLK_APB2>;
+		clocks = <&syscon ASPEED_CLK_GATE_I3C3CLK>;
 		resets = <&syscon ASPEED_RESET_I3C3>;
 		bus-frequency = <100000>;
 		interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
@@ -1131,7 +1138,7 @@
 		#interrupt-cells = <1>;
 		reg = <0x6000 0x1000>;
 		compatible = "snps,dw-i3c-master-1.00a";
-		clocks = <&syscon ASPEED_CLK_APB2>;
+		clocks = <&syscon ASPEED_CLK_GATE_I3C4CLK>;
 		resets = <&syscon ASPEED_RESET_I3C4>;
 		bus-frequency = <100000>;
 		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
@@ -1146,7 +1153,7 @@
 		#interrupt-cells = <1>;
 		reg = <0x7000 0x1000>;
 		compatible = "snps,dw-i3c-master-1.00a";
-		clocks = <&syscon ASPEED_CLK_APB2>;
+		clocks = <&syscon ASPEED_CLK_GATE_I3C5CLK>;
 		resets = <&syscon ASPEED_RESET_I3C5>;
 		bus-frequency = <100000>;
 		interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
