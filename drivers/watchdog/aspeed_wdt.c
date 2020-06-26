@@ -47,7 +47,8 @@ MODULE_DEVICE_TABLE(of, aspeed_wdt_of_table);
 #define   WDT_CTRL_RESET_MODE_SOC	(0x00 << 5)
 #define   WDT_CTRL_RESET_MODE_FULL_CHIP	(0x01 << 5)
 #define   WDT_CTRL_RESET_MODE_ARM_CPU	(0x10 << 5)
-#define   WDT_CTRL_1MHZ_CLK		BIT(4)
+#define   WDT_CTRL_1MHZ_CLK		BIT(4) /* ast2400/2500 */
+#define   WDT_CTRL_WDT_RST_BY_SOC_RST	BIT(4) /* ast2600 */
 #define   WDT_CTRL_WDT_EXT		BIT(3)
 #define   WDT_CTRL_WDT_INTR		BIT(2)
 #define   WDT_CTRL_RESET_SYSTEM		BIT(1)
@@ -277,12 +278,15 @@ static int aspeed_wdt_probe(struct platform_device *pdev)
 	 * On clock rates:
 	 *  - ast2400 wdt can run at PCLK, or 1MHz
 	 *  - ast2500 only runs at 1MHz, hard coding bit 4 to 1
-	 *  - ast2600 always runs at 1MHz
+	 *  - ast2600 uses WDT0C[4] as 'Enable WDT to be reset by SOC reset'
 	 *
 	 * Set the ast2400 to run at 1MHz as it simplifies the driver.
 	 */
-	if (of_device_is_compatible(np, "aspeed,ast2400-wdt"))
+	if (of_device_is_compatible(np, "aspeed,ast2400-wdt") ||
+	    of_device_is_compatible(np, "aspeed,ast2500-wdt"))
 		wdt->ctrl = WDT_CTRL_1MHZ_CLK;
+	else if (of_device_is_compatible(np, "aspeed,ast2600-wdt"))
+		wdt->ctrl = WDT_CTRL_WDT_RST_BY_SOC_RST;
 
 	/*
 	 * Control reset on a per-device basis to ensure the
@@ -367,13 +371,12 @@ static int aspeed_wdt_probe(struct platform_device *pdev)
 		writel(duration - 1, wdt->base + WDT_RESET_WIDTH);
 	}
 
-	status = readl(wdt->base + WDT_TIMEOUT_STATUS);
-	if (status & WDT_TIMEOUT_STATUS_BOOT_SECONDARY) {
-		wdt->wdd.bootstatus = WDIOF_CARDRESET;
-
-		if (of_device_is_compatible(np, "aspeed,ast2400-wdt") ||
-		    of_device_is_compatible(np, "aspeed,ast2500-wdt"))
+	if (!of_device_is_compatible(np, "aspeed,ast2600-wdt")) {
+		status = readl(wdt->base + WDT_TIMEOUT_STATUS);
+		if (status & WDT_TIMEOUT_STATUS_BOOT_SECONDARY) {
+			wdt->wdd.bootstatus = WDIOF_CARDRESET;
 			wdt->wdd.groups = bswitch_groups;
+		}
 	}
 
 	dev_set_drvdata(dev, wdt);
