@@ -53,6 +53,9 @@
 #define ASPEED_ADC_INIT_POLLING_TIME	500
 #define ASPEED_ADC_INIT_TIMEOUT		500000
 
+#define ASPEED_ADC_CHANNELS_MAX		16
+#define ASPEED_ADC_RAW_VALUE_MAX	GENMASK(ASPEED_RESOLUTION_BITS-1, 0)
+
 struct aspeed_adc_model_data {
 	const char *model_name;
 	unsigned int min_sampling_rate;	// Hz
@@ -71,6 +74,7 @@ struct aspeed_adc_data {
 	struct clk_hw		*clk_scaler;
 	struct reset_control	*rst;
 	int 				cv;
+	int	channel_raw_value[ASPEED_ADC_CHANNELS_MAX];
 };
 
 #define ASPEED_CHAN(_idx, _data_reg_addr) {			\
@@ -124,6 +128,13 @@ static int aspeed_adc_read_raw(struct iio_dev *indio_dev,
 	switch (mask) {
 	case IIO_CHAN_INFO_RAW:
 		*val = readw(data->base + chan->address);
+		if (*val == ASPEED_ADC_RAW_VALUE_MAX) {
+			*val = data->channel_raw_value[chan->channel];
+			pr_err("aspeed_adc: channel %d drop invalid raw reading %d\n",
+				chan->channel, ASPEED_ADC_RAW_VALUE_MAX);
+		} else {
+			data->channel_raw_value[chan->channel] = *val;
+		}
 		return IIO_VAL_INT;
 
 	case IIO_CHAN_INFO_SCALE:
@@ -205,6 +216,7 @@ static int aspeed_adc_probe(struct platform_device *pdev)
 	int ret;
 	u32 eng_ctrl = 0;
 	u32 adc_engine_control_reg_val;
+	int i;
 
 	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(*data));
 	if (!indio_dev)
@@ -295,6 +307,9 @@ static int aspeed_adc_probe(struct platform_device *pdev)
 	mdelay(1);
 
 	data->cv = 0x200 - (readl(data->base + 0x10) & GENMASK(9, 0));
+
+	for (i = 0; i < ASPEED_ADC_CHANNELS_MAX; i++)
+		data->channel_raw_value[i] = ASPEED_ADC_RAW_VALUE_MAX;
 
 	writel(eng_ctrl | ASPEED_OPERATION_MODE_NORMAL |
 			ASPEED_ENGINE_ENABLE | ASPEED_AUTOPENSATING, data->base + ASPEED_REG_ENGINE_CONTROL);
