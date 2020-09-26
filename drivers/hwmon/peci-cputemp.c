@@ -362,7 +362,7 @@ static int create_core_temp_label(struct peci_cputemp *priv, int idx)
 	if (!priv->coretemp_label[idx])
 		return -ENOMEM;
 
-	sprintf(priv->coretemp_label[idx], "Core %d", idx + 1);
+	sprintf(priv->coretemp_label[idx], "Core %d", idx);
 
 	return 0;
 }
