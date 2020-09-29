@@ -444,6 +444,15 @@
 				pinctrl-0 = <&pinctrl_espi_default>;
 			};
 
+			jtag: jtag@1e6e4000 {
+				compatible = "aspeed,ast2500-jtag";
+				reg = <0x1e6e4000 0x1c>;
+				clocks = <&syscon ASPEED_CLK_APB>;
+				resets = <&syscon ASPEED_RESET_JTAG_MASTER>;
+				interrupts = <43>;
+				status = "disabled";
+			};
+
 			lpc: lpc@1e789000 {
 				compatible = "aspeed,ast2500-lpc-v2", "simple-mfd", "syscon";
 				reg = <0x1e789000 0x1000>;
