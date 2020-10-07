@@ -1144,14 +1144,6 @@ static int dw_i3c_probe(struct platform_device *pdev)
 	spin_lock_init(&master->xferqueue.lock);
 	INIT_LIST_HEAD(&master->xferqueue.list);
 
-	writel(INTR_ALL, master->regs + INTR_STATUS);
-	irq = platform_get_irq(pdev, 0);
-	ret = devm_request_irq(&pdev->dev, irq,
-			       dw_i3c_master_irq_handler, 0,
-			       dev_name(&pdev->dev), master);
-	if (ret)
-		goto err_assert_rst;
-
 	platform_set_drvdata(pdev, master);
 
 	/* Information regarding the FIFOs/QUEUEs depth */
@@ -1168,6 +1160,14 @@ static int dw_i3c_probe(struct platform_device *pdev)
 
 	ret = i3c_master_register(&master->base, &pdev->dev,
 				  &dw_mipi_i3c_ops, false);
+	if (ret)
+		goto err_assert_rst;
+
+	writel(INTR_ALL, master->regs + INTR_STATUS);
+	irq = platform_get_irq(pdev, 0);
+	ret = devm_request_irq(&pdev->dev, irq,
+			       dw_i3c_master_irq_handler, 0,
+			       dev_name(&pdev->dev), master);
 	if (ret)
 		goto err_assert_rst;
 
