@@ -39,6 +39,7 @@
 #define ASPEED_PECI_CMD				0x08
 #define   ASPEED_PECI_CMD_PIN_MON		BIT(31)
 #define   ASPEED_PECI_CMD_STS_MASK		GENMASK(27, 24)
+#define     ASPEED_PECI_CMD_STS_ADDR_T_NEGO	0x3
 #define   ASPEED_PECI_CMD_IDLE_MASK		\
 	  (ASPEED_PECI_CMD_STS_MASK | ASPEED_PECI_CMD_PIN_MON)
 #define   ASPEED_PECI_CMD_FIRE			BIT(0)
@@ -125,11 +126,49 @@ struct aspeed_peci {
 	struct completion	xfer_complete;
 	u32			status;
 	u32			cmd_timeout_ms;
+	u32			msg_timing;
+	u32			addr_timing;
+	u32			rd_sampling_point;
+	u32			clk_div_val;
 };
+
+static void aspeed_peci_init_regs(struct aspeed_peci *priv)
+{
+	writel(FIELD_PREP(ASPEED_PECI_CTRL_CLK_DIV_MASK,
+			  ASPEED_PECI_CLK_DIV_DEFAULT) |
+	       ASPEED_PECI_CTRL_PECI_CLK_EN, priv->base + ASPEED_PECI_CTRL);
+
+	/*
+	 * Timing negotiation period setting.
+	 * The unit of the programmed value is 4 times of PECI clock period.
+	 */
+	writel(FIELD_PREP(ASPEED_PECI_TIMING_MESSAGE_MASK, priv->msg_timing) |
+	       FIELD_PREP(ASPEED_PECI_TIMING_ADDRESS_MASK, priv->addr_timing),
+	       priv->base + ASPEED_PECI_TIMING_NEGOTIATION);
+
+	/* Clear interrupts */
+	writel(readl(priv->base + ASPEED_PECI_INT_STS) | ASPEED_PECI_INT_MASK,
+	       priv->base + ASPEED_PECI_INT_STS);
+
+	/* Set timing negotiation mode and enable interrupts */
+	writel(FIELD_PREP(ASPEED_PECI_TIMING_NEGO_SEL_MASK,
+			  ASPEED_PECI_1ST_BIT_OF_ADDR_NEGO) |
+	       ASPEED_PECI_INT_MASK, priv->base + ASPEED_PECI_INT_CTRL);
+
+	/* Read sampling point and clock speed setting */
+	writel(FIELD_PREP(ASPEED_PECI_CTRL_SAMPLING_MASK, priv->rd_sampling_point) |
+	       FIELD_PREP(ASPEED_PECI_CTRL_CLK_DIV_MASK, priv->clk_div_val) |
+	       ASPEED_PECI_CTRL_PECI_EN | ASPEED_PECI_CTRL_PECI_CLK_EN,
+	       priv->base + ASPEED_PECI_CTRL);
+}
 
 static inline int aspeed_peci_check_idle(struct aspeed_peci *priv)
 {
-	u32 cmd_sts;
+	u32 cmd_sts = readl(priv->base + ASPEED_PECI_CMD);
+
+	if (FIELD_GET(ASPEED_PECI_CMD_STS_MASK,
+		      cmd_sts) == ASPEED_PECI_CMD_STS_ADDR_T_NEGO)
+		aspeed_peci_init_regs(priv);
 
 	return readl_poll_timeout(priv->base + ASPEED_PECI_CMD,
 				  cmd_sts,
@@ -307,6 +346,7 @@ static int aspeed_peci_init_ctrl(struct aspeed_peci *priv)
 
 	while ((clk_divisor >>= 1) && (clk_div_val < ASPEED_PECI_CLK_DIV_MAX))
 		clk_div_val++;
+	priv->clk_div_val = clk_div_val;
 
 	ret = device_property_read_u32(priv->dev, "msg-timing", &msg_timing);
 	if (ret || msg_timing > ASPEED_PECI_MSG_TIMING_MAX) {
@@ -316,6 +356,7 @@ static int aspeed_peci_init_ctrl(struct aspeed_peci *priv)
 				 msg_timing, ASPEED_PECI_MSG_TIMING_DEFAULT);
 		msg_timing = ASPEED_PECI_MSG_TIMING_DEFAULT;
 	}
+	priv->msg_timing = msg_timing;
 
 	ret = device_property_read_u32(priv->dev, "addr-timing", &addr_timing);
 	if (ret || addr_timing > ASPEED_PECI_ADDR_TIMING_MAX) {
@@ -325,6 +366,7 @@ static int aspeed_peci_init_ctrl(struct aspeed_peci *priv)
 				 addr_timing, ASPEED_PECI_ADDR_TIMING_DEFAULT);
 		addr_timing = ASPEED_PECI_ADDR_TIMING_DEFAULT;
 	}
+	priv->addr_timing = addr_timing;
 
 	ret = device_property_read_u32(priv->dev, "rd-sampling-point",
 				       &rd_sampling_point);
@@ -336,6 +378,7 @@ static int aspeed_peci_init_ctrl(struct aspeed_peci *priv)
 				 ASPEED_PECI_RD_SAMPLING_POINT_DEFAULT);
 		rd_sampling_point = ASPEED_PECI_RD_SAMPLING_POINT_DEFAULT;
 	}
+	priv->rd_sampling_point = rd_sampling_point;
 
 	ret = device_property_read_u32(priv->dev, "cmd-timeout-ms",
 				       &priv->cmd_timeout_ms);
@@ -349,32 +392,7 @@ static int aspeed_peci_init_ctrl(struct aspeed_peci *priv)
 		priv->cmd_timeout_ms = ASPEED_PECI_CMD_TIMEOUT_MS_DEFAULT;
 	}
 
-	writel(FIELD_PREP(ASPEED_PECI_CTRL_CLK_DIV_MASK,
-			  ASPEED_PECI_CLK_DIV_DEFAULT) |
-	       ASPEED_PECI_CTRL_PECI_CLK_EN, priv->base + ASPEED_PECI_CTRL);
-
-	/*
-	 * Timing negotiation period setting.
-	 * The unit of the programmed value is 4 times of PECI clock period.
-	 */
-	writel(FIELD_PREP(ASPEED_PECI_TIMING_MESSAGE_MASK, msg_timing) |
-	       FIELD_PREP(ASPEED_PECI_TIMING_ADDRESS_MASK, addr_timing),
-	       priv->base + ASPEED_PECI_TIMING_NEGOTIATION);
-
-	/* Clear interrupts */
-	writel(readl(priv->base + ASPEED_PECI_INT_STS) | ASPEED_PECI_INT_MASK,
-	       priv->base + ASPEED_PECI_INT_STS);
-
-	/* Set timing negotiation mode and enable interrupts */
-	writel(FIELD_PREP(ASPEED_PECI_TIMING_NEGO_SEL_MASK,
-			  ASPEED_PECI_1ST_BIT_OF_ADDR_NEGO) |
-	       ASPEED_PECI_INT_MASK, priv->base + ASPEED_PECI_INT_CTRL);
-
-	/* Read sampling point and clock speed setting */
-	writel(FIELD_PREP(ASPEED_PECI_CTRL_SAMPLING_MASK, rd_sampling_point) |
-	       FIELD_PREP(ASPEED_PECI_CTRL_CLK_DIV_MASK, clk_div_val) |
-	       ASPEED_PECI_CTRL_PECI_EN | ASPEED_PECI_CTRL_PECI_CLK_EN,
-	       priv->base + ASPEED_PECI_CTRL);
+	aspeed_peci_init_regs(priv);
 
 	return 0;
 }
