@@ -132,7 +132,7 @@ struct aspeed_peci {
 	u32			clk_div_val;
 };
 
-static int aspeed_peci_init_regs(struct aspeed_peci *priv)
+static void aspeed_peci_init_regs(struct aspeed_peci *priv)
 {
 	writel(FIELD_PREP(ASPEED_PECI_CTRL_CLK_DIV_MASK,
 			  ASPEED_PECI_CLK_DIV_DEFAULT) |
@@ -165,7 +165,6 @@ static int aspeed_peci_init_regs(struct aspeed_peci *priv)
 static inline int aspeed_peci_check_idle(struct aspeed_peci *priv)
 {
 	u32 cmd_sts = readl(priv->base + ASPEED_PECI_CMD);
-	int ret;
 
 	if (FIELD_GET(ASPEED_PECI_CMD_STS_MASK,
 		      cmd_sts) == ASPEED_PECI_CMD_STS_ADDR_T_NEGO)
