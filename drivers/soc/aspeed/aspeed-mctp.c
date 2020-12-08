@@ -643,13 +643,6 @@ static int aspeed_mctp_open(struct inode *inode, struct file *file)
 		return -ENOMEM;
 
 	file->private_data = client;
-	/*
-	 * XXX Temporary hack: use first user space client as default client
-	 * that receives all packets - remove this code once the mctpd
-	 * service registers itself as default client.
-	 */
-	if (!priv->default_client)
-		priv->default_client = client;
 
 	return 0;
 }
