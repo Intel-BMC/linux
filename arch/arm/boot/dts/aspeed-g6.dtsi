@@ -1088,6 +1088,7 @@
 		reg = <0x0 0x1000>;
 		compatible = "aspeed,ast2600-i3c-global";
 		resets = <&syscon ASPEED_RESET_I3C_DMA>;
+		ni3cs = <6>;
 		status = "disabled";
 	};
 
@@ -1099,7 +1100,8 @@
 		compatible = "snps,dw-i3c-master-1.00a";
 		clocks = <&syscon ASPEED_CLK_GATE_I3C0CLK>;
 		resets = <&syscon ASPEED_RESET_I3C0>;
-		bus-frequency = <100000>;
+		i2c-scl-hz = <400000>;
+		i3c-scl-hz = <12500000>;
 		interrupts = <GIC_SPI 102 IRQ_TYPE_LEVEL_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_i3c1_default>;
@@ -1114,7 +1116,8 @@
 		compatible = "snps,dw-i3c-master-1.00a";
 		clocks = <&syscon ASPEED_CLK_GATE_I3C1CLK>;
 		resets = <&syscon ASPEED_RESET_I3C1>;
-		bus-frequency = <100000>;
+		i2c-scl-hz = <400000>;
+		i3c-scl-hz = <12500000>;
 		interrupts = <GIC_SPI 103 IRQ_TYPE_LEVEL_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_i3c2_default>;
@@ -1129,7 +1132,8 @@
 		compatible = "snps,dw-i3c-master-1.00a";
 		clocks = <&syscon ASPEED_CLK_GATE_I3C2CLK>;
 		resets = <&syscon ASPEED_RESET_I3C2>;
-		bus-frequency = <100000>;
+		i2c-scl-hz = <400000>;
+		i3c-scl-hz = <12500000>;
 		interrupts = <GIC_SPI 104 IRQ_TYPE_LEVEL_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_i3c3_default>;
@@ -1144,7 +1148,8 @@
 		compatible = "snps,dw-i3c-master-1.00a";
 		clocks = <&syscon ASPEED_CLK_GATE_I3C3CLK>;
 		resets = <&syscon ASPEED_RESET_I3C3>;
-		bus-frequency = <100000>;
+		i2c-scl-hz = <400000>;
+		i3c-scl-hz = <12500000>;
 		interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_i3c4_default>;
@@ -1159,7 +1164,8 @@
 		compatible = "snps,dw-i3c-master-1.00a";
 		clocks = <&syscon ASPEED_CLK_GATE_I3C4CLK>;
 		resets = <&syscon ASPEED_RESET_I3C4>;
-		bus-frequency = <100000>;
+		i2c-scl-hz = <400000>;
+		i3c-scl-hz = <12500000>;
 		interrupts = <GIC_SPI 106 IRQ_TYPE_LEVEL_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_i3c5_default>;
@@ -1174,7 +1180,8 @@
 		compatible = "snps,dw-i3c-master-1.00a";
 		clocks = <&syscon ASPEED_CLK_GATE_I3C5CLK>;
 		resets = <&syscon ASPEED_RESET_I3C5>;
-		bus-frequency = <100000>;
+		i2c-scl-hz = <400000>;
+		i3c-scl-hz = <12500000>;
 		interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_i3c6_default>;
