@@ -487,6 +487,7 @@ struct i3c_master_controller {
 	const struct i3c_master_controller_ops *ops;
 	unsigned int secondary : 1;
 	unsigned int init_done : 1;
+	unsigned int jdec_spd : 1;
 	struct {
 		struct list_head i3c;
 		struct list_head i2c;

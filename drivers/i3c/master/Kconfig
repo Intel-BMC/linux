@@ -22,7 +22,11 @@ config DW_I3C_MASTER
 	  This driver can also be built as a module.  If so, the module
 	  will be called dw-i3c-master.
 
-config ASPEED_I3C_GLOBAL
-	tristate "ASPEED I3C global driver"
+config ASPEED_I3C_MASTER
+	tristate "Aspeed I3C master driver"
 	depends on I3C
 	depends on MACH_ASPEED_G6
+	select DW_I3C_MASTER
+	help
+	  Aspeed I3C master controller is a Synopsys DesignWare I3C controller
+	  plus additional global control.
