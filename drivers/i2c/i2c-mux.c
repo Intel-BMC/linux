@@ -53,7 +53,8 @@ static void i2c_mux_hold_timer_callback(struct timer_list *t)
 {
 	struct i2c_mux_core *muxc = from_timer(muxc, t, hold_timer);
 
-	i2c_mux_unhold(muxc);
+	del_timer(&muxc->hold_timer);
+	mutex_unlock(&muxc->hold_lock);
 }
 
 static int __i2c_mux_master_xfer(struct i2c_adapter *adap,

@@ -1281,7 +1281,8 @@ static void i2c_adapter_hold_timer_callback(struct timer_list *t)
 {
 	struct i2c_adapter *adapter = from_timer(adapter, t, hold_timer);
 
-	i2c_adapter_unhold(adapter);
+	del_timer(&adapter->hold_timer);
+	mutex_unlock(&adapter->hold_lock);
 }
 
 static int i2c_register_adapter(struct i2c_adapter *adap)
