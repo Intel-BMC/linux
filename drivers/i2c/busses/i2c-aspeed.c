@@ -1610,6 +1610,9 @@ static int aspeed_i2c_probe_bus(struct platform_device *pdev)
 	writel(0, bus->base + ASPEED_I2C_INTR_CTRL_REG);
 	writel(0xffffffff, bus->base + ASPEED_I2C_INTR_STS_REG);
 
+	/* Clear slave addresses. */
+	writel(0, bus->base + ASPEED_I2C_DEV_ADDR_REG);
+
 	parent_clk = devm_clk_get(&pdev->dev, NULL);
 	if (IS_ERR(parent_clk))
 		return PTR_ERR(parent_clk);
