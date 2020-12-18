@@ -175,6 +175,9 @@ struct aspeed_mctp {
 	spinlock_t clients_lock;
 	struct list_head endpoints;
 	size_t endpoints_count;
+	/*
+	 * endpoints_lock protects list of endpoints
+	 */
 	struct mutex endpoints_lock;
 	struct {
 		struct regmap *map;
@@ -994,11 +997,11 @@ static int
 aspeed_mctp_get_eid_info(struct aspeed_mctp *priv, void __user *userbuf)
 {
 	int count = 0;
+	int ret = 0;
 	struct aspeed_mctp_get_eid_info get_eid;
 	struct aspeed_mctp_endpoint *endpoint;
 	struct aspeed_mctp_eid_info *user_ptr;
 	size_t count_to_copy;
-	int ret;
 
 	if (copy_from_user(&get_eid, userbuf, sizeof(get_eid))) {
 		dev_err(priv->dev, "copy from user failed\n");
@@ -1008,7 +1011,7 @@ aspeed_mctp_get_eid_info(struct aspeed_mctp *priv, void __user *userbuf)
 	mutex_lock(&priv->endpoints_lock);
 
 	if (get_eid.count == 0) {
-		ret = priv->endpoints_count;
+		count = priv->endpoints_count;
 		goto out_unlock;
 	}
 
@@ -1027,8 +1030,14 @@ aspeed_mctp_get_eid_info(struct aspeed_mctp *priv, void __user *userbuf)
 		}
 		count++;
 	}
-	ret = count;
+
 out_unlock:
+	get_eid.count = count;
+	if (copy_to_user(userbuf, &get_eid, sizeof(get_eid))) {
+		dev_err(priv->dev, "copy to user failed\n");
+		ret = -EFAULT;
+	}
+
 	mutex_unlock(&priv->endpoints_lock);
 	return ret;
 }
@@ -1127,7 +1136,10 @@ aspeed_mctp_set_eid_info(struct aspeed_mctp *priv, void __user *userbuf)
 	}
 
 	mutex_lock(&priv->endpoints_lock);
-	list_swap(&priv->endpoints, &list);
+	if (list_empty(&priv->endpoints))
+		list_splice_init(&list, &priv->endpoints);
+	else
+		list_swap(&list, &priv->endpoints);
 	priv->endpoints_count = set_eid.count;
 	mutex_unlock(&priv->endpoints_lock);
 out:
