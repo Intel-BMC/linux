@@ -1180,7 +1180,7 @@ static int __init aspeed_gpio_probe(struct platform_device *pdev)
 	gpio->chip.set = aspeed_gpio_set;
 	gpio->chip.set_config = aspeed_gpio_set_config;
 	gpio->chip.label = dev_name(&pdev->dev);
-	gpio->chip.base = 0;
+	gpio->chip.base = -1;
 
 	/* Allocate a cache of the output registers */
 	banks = DIV_ROUND_UP(gpio->chip.ngpio, 32);

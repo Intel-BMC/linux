@@ -681,7 +681,7 @@ static int __init aspeed_sgpio_probe(struct platform_device *pdev)
 	gpio->chip.set = aspeed_sgpio_set;
 	gpio->chip.set_config = aspeed_sgpio_set_config;
 	gpio->chip.label = dev_name(&pdev->dev);
-	gpio->chip.base = gpio->config->nr_pgpios;
+	gpio->chip.base = -1;
 
 	rc = aspeed_sgpio_setup_irqs(gpio, pdev);
 	if (rc < 0)
