@@ -686,8 +686,8 @@ static int aspeed_mctp_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-int aspeed_mctp_write_packet(struct mctp_client *client,
-			     struct mctp_pcie_packet *tx_packet)
+int aspeed_mctp_send_packet(struct mctp_client *client,
+			    struct mctp_pcie_packet *tx_packet)
 {
 	struct aspeed_mctp *priv = client->priv;
 	int ret;
@@ -704,12 +704,13 @@ int aspeed_mctp_write_packet(struct mctp_client *client,
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(aspeed_mctp_write_packet);
+EXPORT_SYMBOL_GPL(aspeed_mctp_send_packet);
 
-struct mctp_pcie_packet *aspeed_mctp_read_packet(struct mctp_client *client,
-						 unsigned long timeout)
+struct mctp_pcie_packet *aspeed_mctp_receive_packet(struct mctp_client *client,
+						    unsigned long timeout)
 {
 	struct aspeed_mctp *priv = client->priv;
+	struct mctp_pcie_packet *packet;
 	int ret;
 
 	if (priv->pcie.bdf == 0)
@@ -718,12 +719,23 @@ struct mctp_pcie_packet *aspeed_mctp_read_packet(struct mctp_client *client,
 	ret = wait_event_interruptible_timeout(client->wait_queue,
 					       __ptr_ring_peek(&client->rx_queue),
 					       timeout);
-	if (ret == 0)
-		return ERR_PTR(-EAGAIN);
+	if (ret < 0)
+		return ERR_PTR(ret);
+	else if (ret == 0)
+		return ERR_PTR(-ETIME);
 
 	return ptr_ring_consume_bh(&client->rx_queue);
 }
-EXPORT_SYMBOL_GPL(aspeed_mctp_read_packet);
+EXPORT_SYMBOL_GPL(aspeed_mctp_receive_packet);
+
+void aspeed_mctp_flush_rx_queue(struct mctp_client *client)
+{
+	struct mctp_pcie_packet *packet;
+
+	while (packet = ptr_ring_consume_bh(&client->rx_queue))
+		aspeed_mctp_packet_free(packet);
+}
+EXPORT_SYMBOL_GPL(aspeed_mctp_flush_rx_queue);
 
 static ssize_t aspeed_mctp_read(struct file *file, char __user *buf,
 				size_t count, loff_t *ppos)
@@ -783,7 +795,7 @@ static ssize_t aspeed_mctp_write(struct file *file, const char __user *buf,
 
 	tx_packet->size = count;
 
-	ret = aspeed_mctp_write_packet(client, tx_packet);
+	ret = aspeed_mctp_send_packet(client, tx_packet);
 	if (ret)
 		goto out_packet;
 

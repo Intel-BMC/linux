@@ -81,7 +81,7 @@ struct mctp_client *aspeed_mctp_create_client(struct aspeed_mctp *priv);
 void aspeed_mctp_delete_client(struct mctp_client *client);
 
 /**
- * aspeed_mctp_write_packet() - send mctp_packet
+ * aspeed_mctp_send_packet() - send mctp_packet
  * @client: pointer to existing mctp_client context
  * @tx_packet: the allocated packet that needs to be send via aspeed-mctp
  *
@@ -92,11 +92,11 @@ void aspeed_mctp_delete_client(struct mctp_client *client);
  * * 0 - success,
  * * -ENOSPC - failed to send packet due to lack of available space.
  */
-int aspeed_mctp_write_packet(struct mctp_client *client,
-			     struct mctp_pcie_packet *tx_packet);
+int aspeed_mctp_send_packet(struct mctp_client *client,
+			    struct mctp_pcie_packet *tx_packet);
 
 /**
- * aspeed_mctp_read_packet() - receive mctp_packet
+ * aspeed_mctp_receive_packet() - receive mctp_packet
  * @client: pointer to existing mctp_client context
  * @timeout: timeout, in jiffies
  *
@@ -108,8 +108,14 @@ int aspeed_mctp_write_packet(struct mctp_client *client,
  * Returns struct mctp_pcie_packet from or ERR_PTR in case of error or the
  * @timeout elapsed.
  */
-struct mctp_pcie_packet *aspeed_mctp_read_packet(struct mctp_client *client,
-						 unsigned long timeout);
+struct mctp_pcie_packet *aspeed_mctp_receive_packet(struct mctp_client *client,
+						    unsigned long timeout);
+
+/**
+ * aspeed_mctp_flush_rx_queue() - remove all mctp_packets from rx queue
+ * @client: pointer to existing mctp_client context
+ */
+void aspeed_mctp_flush_rx_queue(struct mctp_client *client);
 
 void *aspeed_mctp_packet_alloc(gfp_t flags);
 void aspeed_mctp_packet_free(void *packet);
