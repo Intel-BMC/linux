@@ -82,6 +82,11 @@
 			gpios = <&gpio0 ASPEED_GPIO(G, 2) GPIO_ACTIVE_LOW>;
 		};
 
+		status_susack {
+			default-state = "off";
+			gpios = <&gpio0 ASPEED_GPIO(V, 6) GPIO_ACTIVE_LOW>;
+		};
+
 		fan1_fault {
 			default-state = "off";
 			gpios = <&sgpio ASPEED_GPIO(C, 4) GPIO_ACTIVE_HIGH>;
