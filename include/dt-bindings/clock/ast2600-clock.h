@@ -92,6 +92,7 @@
 #define ASPEED_CLK_MAX			73
 
 /* Only list resets here that are not part of a gate */
+#define ASPEED_RESET_ESPI		57
 #define ASPEED_RESET_ADC		55
 #define ASPEED_RESET_JTAG_MASTER2	54
 #define ASPEED_RESET_I3C7		47
@@ -107,7 +108,7 @@
 #define ASPEED_RESET_PECI		36
 #define ASPEED_RESET_MII		35
 #define ASPEED_RESET_I2C		34
-#define ASPEED_RESET_ESPI		32
+#define ASPEED_RESET_LPC		32
 #define ASPEED_RESET_H2X		31
 #define ASPEED_RESET_GP_MCU		30
 #define ASPEED_RESET_DP_MCU		29
