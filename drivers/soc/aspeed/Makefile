@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: GPL-2.0-only
+obj-$(CONFIG_ASPEED_ESPI_SLAVE)	+= aspeed-espi-slave.o
 obj-$(CONFIG_ASPEED_LPC_CTRL)	+= aspeed-lpc-ctrl.o
 obj-$(CONFIG_ASPEED_LPC_MBOX)	+= aspeed-lpc-mbox.o
 obj-$(CONFIG_ASPEED_LPC_SIO)	+= aspeed-lpc-sio.o
