@@ -1384,11 +1384,14 @@ static int dw_i3c_probe(struct platform_device *pdev)
 	master->maxdevs = ret >> 16;
 	master->free_pos = GENMASK(master->maxdevs - 1, 0);
 #ifdef CCC_WORKAROUND
-	master->free_pos &= ~BIT(master->maxdevs - 1);
-	ret = (even_parity(I3C_BROADCAST_ADDR) << 7) | I3C_BROADCAST_ADDR;
-	master->addrs[master->maxdevs - 1] = ret;
-	writel(DEV_ADDR_TABLE_DYNAMIC_ADDR(ret),
-	       master->regs + DEV_ADDR_TABLE_LOC(master->datstartaddr, master->maxdevs - 1));
+	if (master->maxdevs > 0) {
+		master->free_pos &= ~BIT(master->maxdevs - 1);
+		ret = (even_parity(I3C_BROADCAST_ADDR) << 7) | I3C_BROADCAST_ADDR;
+		master->addrs[master->maxdevs - 1] = ret;
+		writel(DEV_ADDR_TABLE_DYNAMIC_ADDR(ret),
+			   master->regs + DEV_ADDR_TABLE_LOC(master->datstartaddr,
+							     master->maxdevs - 1));
+	}
 #endif
 
 	writel(INTR_ALL, master->regs + INTR_STATUS);
