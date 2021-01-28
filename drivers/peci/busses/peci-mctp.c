@@ -11,29 +11,29 @@ static bool enable_probe;
 module_param_named(enable, enable_probe, bool, 0644);
 MODULE_PARM_DESC(enable, "Enable peci-mctp device (default: false)");
 
-#define PCIE_SET_DATA_LEN(x, val) ((x)->len_lo |= (val))
-#define PCIE_SET_TARGET_ID(x, val) ((x)->target |= (swab16(val)))
-#define PCIE_PKT_ALIGN(x) ALIGN(x, sizeof(u32))
-#define PCIE_GET_REQUESTER_ID(x) (swab16((x)->requester))
+#define PCIE_SET_DATA_LEN(x, val)	((x)->len_lo |= (val))
+#define PCIE_SET_TARGET_ID(x, val)	((x)->target |= (swab16(val)))
+#define PCIE_PKT_ALIGN(x)		ALIGN(x, sizeof(u32))
+#define PCIE_GET_REQUESTER_ID(x)	(swab16((x)->requester))
 
 /*
  * PCIe header template in "network format" - Big Endian
  */
-#define MSG_4DW_HDR_ROUTE_BY_ID 0x72
-#define MSG_CODE_VDM_TYPE_1 0x7f
-#define VENDOR_ID_DMTF_VDM 0xb41a
+#define MSG_4DW_HDR_ROUTE_BY_ID	0x72
+#define MSG_CODE_VDM_TYPE_1	0x7f
+#define VENDOR_ID_DMTF_VDM	0xb41a
 static const struct pcie_transport_hdr pcie_hdr_template_be = {
 	.fmt_type = MSG_4DW_HDR_ROUTE_BY_ID,
 	.code = MSG_CODE_VDM_TYPE_1,
 	.vendor = VENDOR_ID_DMTF_VDM
 };
 
-#define MSG_TAG_MASK GENMASK(2, 0)
-#define MCTP_SET_MSG_TAG(x, val) ((x)->flags_seq_tag |= ((val) & MSG_TAG_MASK))
-#define MCTP_GET_MSG_TAG(x) ((x)->flags_seq_tag & MSG_TAG_MASK)
-#define MCTP_HDR_VERSION 1
-#define REQUEST_FLAGS 0xc8
-#define RESPONSE_FLAGS 0xc0
+#define MSG_TAG_MASK			GENMASK(2, 0)
+#define MCTP_SET_MSG_TAG(x, val)	((x)->flags_seq_tag |= ((val) & MSG_TAG_MASK))
+#define MCTP_GET_MSG_TAG(x)		((x)->flags_seq_tag & MSG_TAG_MASK)
+#define MCTP_HDR_VERSION		1
+#define REQUEST_FLAGS			0xc8
+#define RESPONSE_FLAGS			0xc0
 static const struct mctp_protocol_hdr mctp_hdr_template_be = {
 	.ver = MCTP_HDR_VERSION,
 	.flags_seq_tag = REQUEST_FLAGS
@@ -46,11 +46,11 @@ static struct mctp_peci_vdm_hdr {
 	u8 vendor_code;
 } __packed;
 
-#define PCIE_VDM_TYPE 0x7e
-#define INTEL_VENDOR_ID 0x8680
-#define PECI_REQUEST 0x80
-#define PECI_RESPONSE 0
-#define PECI_MSG_OPCODE 0x02
+#define PCIE_VDM_TYPE	0x7e
+#define INTEL_VENDOR_ID	0x8680
+#define PECI_REQUEST	0x80
+#define PECI_RESPONSE	0
+#define PECI_MSG_OPCODE	0x02
 static const struct mctp_peci_vdm_hdr peci_hdr_template = {
 	.type = PCIE_VDM_TYPE,
 	.vendor_id = INTEL_VENDOR_ID,
@@ -58,8 +58,8 @@ static const struct mctp_peci_vdm_hdr peci_hdr_template = {
 	.vendor_code = PECI_MSG_OPCODE
 };
 
-#define PECI_VDM_TYPE 0x0200
-#define PECI_VDM_MASK 0xff00
+#define PECI_VDM_TYPE	0x0200
+#define PECI_VDM_MASK	0xff00
 
 struct mctp_peci {
 	struct peci_adapter *adapter;
@@ -138,7 +138,7 @@ static void prepare_tx_packet(struct mctp_pcie_packet *tx_packet,
 
 static int
 verify_rx_packet(struct peci_adapter *adapter, struct mctp_pcie_packet *rx_packet,
-		 struct peci_xfer_msg *msg, u8 eid, u16 bdf, u8 tag)
+		 u8 eid, u16 bdf, u8 tag)
 {
 	struct mctp_peci *priv = peci_get_adapdata(adapter);
 	bool invalid_packet = false;
@@ -231,7 +231,7 @@ mctp_peci_xfer(struct peci_adapter *adapter, struct peci_xfer_msg *msg)
 retry:
 	rx_packet = aspeed_mctp_receive_packet(priv->peci_client, timeout);
 	if (IS_ERR(rx_packet)) {
-		if (PTR_ERR(rx_packet != -ERESTARTSYS))
+		if (PTR_ERR(rx_packet) != -ERESTARTSYS)
 			dev_err_ratelimited(priv->dev, "failed to receive mctp packet: %ld\n",
 					    PTR_ERR(rx_packet));
 
@@ -239,7 +239,7 @@ retry:
 	}
 	BUG_ON(!rx_packet);
 
-	ret = verify_rx_packet(adapter, rx_packet, msg, eid, bdf, tag);
+	ret = verify_rx_packet(adapter, rx_packet, eid, bdf, tag);
 	current_time = jiffies;
 	if (ret && time_before(current_time, end_time)) {
 		aspeed_mctp_packet_free(rx_packet);
