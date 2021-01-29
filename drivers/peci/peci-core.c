@@ -304,15 +304,16 @@ static int peci_scan_cmd_mask(struct peci_adapter *adapter)
 	msg->tx_buf[0] = PECI_GET_DIB_CMD;
 
 	ret = peci_xfer(adapter, msg);
-	if (ret || msg->rx_buf[0] == PECI_DEV_CC_INVALID_REQ) {
+	if (ret) {
+		ret = -EAGAIN;
+		goto out;
+	}
+	if (msg->rx_buf[0] == PECI_DEV_CC_INVALID_REQ) {
 		/*
 		 * if GetDIB() is not supported, use a revision property of
 		 * hardware adapter
 		 */
-		if (adapter->peci_revision != 0)
-			revision = adapter->peci_revision;
-		else
-			revision = 0;
+		revision = adapter->peci_revision;
 	} else {
 		dib = le64_to_cpup((__le64 *)msg->rx_buf);
 
