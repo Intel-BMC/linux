@@ -18,19 +18,45 @@
 
 #define MBX_USE_INTERRUPT 1
 
-#define ASPEED_MBOX_NUM_REGS 16
-
-#define ASPEED_MBOX_DATA_0 0x00
-#define ASPEED_MBOX_STATUS_0 0x40
-#define ASPEED_MBOX_STATUS_1 0x44
-#define ASPEED_MBOX_BMC_CTRL 0x48
 #define   ASPEED_MBOX_CTRL_RECV BIT(7)
 #define   ASPEED_MBOX_CTRL_MASK BIT(1)
 #define   ASPEED_MBOX_CTRL_SEND BIT(0)
-#define ASPEED_MBOX_HOST_CTRL 0x4c
-#define ASPEED_MBOX_INTERRUPT_0 0x50
-#define ASPEED_MBOX_INTERRUPT_1 0x54
-#define MBOX_FIFO_SIZE 64
+
+#define AST2600_MBOX_NUM_REGS 32
+#define AST2600_MBOX_DATA_0 0x00
+#define AST2600_MBOX_STATUS_0 0x80
+#define AST2600_MBOX_BMC_CTRL 0x90
+#define AST2600_MBOX_INTERRUPT_0 0xA0
+
+#define AST2500_MBOX_NUM_REGS 16
+#define AST2500_MBOX_DATA_0 0x00
+#define AST2500_MBOX_STATUS_0 0x40
+#define AST2500_MBOX_BMC_CTRL 0x48
+#define AST2500_MBOX_INTERRUPT_0 0x50
+
+struct aspeed_mbox_config {
+	u32 num_regs;
+	u32 data_offset;
+	u32 status_offset;
+	u32 bmc_control_offset;
+	u32 bmc_interrupt_offset;
+};
+
+static const struct aspeed_mbox_config ast2500_config = {
+	.num_regs = AST2500_MBOX_NUM_REGS,
+	.data_offset = AST2500_MBOX_DATA_0,
+	.status_offset = AST2500_MBOX_STATUS_0,
+	.bmc_control_offset = AST2500_MBOX_BMC_CTRL,
+	.bmc_interrupt_offset = AST2500_MBOX_INTERRUPT_0,
+};
+
+static const struct aspeed_mbox_config ast2600_config = {
+	.num_regs = AST2600_MBOX_NUM_REGS,
+	.data_offset = AST2600_MBOX_DATA_0,
+	.status_offset = AST2600_MBOX_STATUS_0,
+	.bmc_control_offset = AST2600_MBOX_BMC_CTRL,
+	.bmc_interrupt_offset = AST2600_MBOX_INTERRUPT_0,
+};
 
 struct aspeed_mbox {
 	struct miscdevice	miscdev;
@@ -42,6 +68,7 @@ struct aspeed_mbox {
 	struct mutex		mutex;
 	struct kfifo		fifo;
 	spinlock_t			lock;
+	struct aspeed_mbox_config	configs;
 };
 
 static atomic_t aspeed_mbox_open_count = ATOMIC_INIT(0);
@@ -103,9 +130,9 @@ static int aspeed_mbox_open(struct inode *inode, struct file *file)
 		 */
 		kfifo_reset(&mbox->fifo);
 		spin_lock_irq(&mbox->lock);
-		for (i = 0; i < ASPEED_MBOX_NUM_REGS; i++) {
+		for (i = 0; i < mbox->configs.num_regs; i++) {
 			put_fifo_with_discard(mbox,
-					aspeed_mbox_inb(mbox, ASPEED_MBOX_DATA_0 + (i * 4)));
+					aspeed_mbox_inb(mbox, mbox->configs.data_offset + (i * 4)));
 		}
 		spin_unlock_irq(&mbox->lock);
 
@@ -130,7 +157,7 @@ static ssize_t aspeed_mbox_read(struct file *file, char __user *buf,
 	if (!access_ok(buf, count))
 		return -EFAULT;
 
-	if (count + *ppos > ASPEED_MBOX_NUM_REGS)
+	if (count + *ppos > mbox->configs.num_regs)
 		return -EINVAL;
 
 #if MBX_USE_INTERRUPT
@@ -138,7 +165,7 @@ static ssize_t aspeed_mbox_read(struct file *file, char __user *buf,
 	 * Restrict count as per the number of mailbox registers
 	 * to use kfifo.
 	 */
-	if (count != ASPEED_MBOX_NUM_REGS)
+	if (count != mbox->configs.num_regs)
 		goto reg_read;
 
 	if (kfifo_is_empty(&mbox->fifo)) {
@@ -162,8 +189,8 @@ static ssize_t aspeed_mbox_read(struct file *file, char __user *buf,
 reg_read:
 	mutex_lock(&mbox->mutex);
 
-	for (i = *ppos; count > 0 && i < ASPEED_MBOX_NUM_REGS; i++) {
-		uint8_t reg = aspeed_mbox_inb(mbox, ASPEED_MBOX_DATA_0 + (i * 4));
+	for (i = *ppos; count > 0 && i < mbox->configs.num_regs; i++) {
+		uint8_t reg = aspeed_mbox_inb(mbox, mbox->configs.data_offset + (i * 4));
 
 		ret = __put_user(reg, p);
 		if (ret)
@@ -191,24 +218,27 @@ static ssize_t aspeed_mbox_write(struct file *file, const char __user *buf,
 	if (!access_ok(buf, count))
 		return -EFAULT;
 
-	if (count + *ppos > ASPEED_MBOX_NUM_REGS)
+	if (count + *ppos > mbox->configs.num_regs)
 		return -EINVAL;
 
 	mutex_lock(&mbox->mutex);
 
-	for (i = *ppos; count > 0 && i < ASPEED_MBOX_NUM_REGS; i++) {
+	for (i = *ppos; count > 0 && i < mbox->configs.num_regs; i++) {
 		ret = __get_user(c, p);
 		if (ret)
 			goto out_unlock;
 
-		aspeed_mbox_outb(mbox, c, ASPEED_MBOX_DATA_0 + (i * 4));
+		aspeed_mbox_outb(mbox, c, mbox->configs.data_offset + (i * 4));
 		p++;
 		count--;
 	}
 
-	aspeed_mbox_outb(mbox, 0xff, ASPEED_MBOX_STATUS_0);
-	aspeed_mbox_outb(mbox, 0xff, ASPEED_MBOX_STATUS_1);
-	aspeed_mbox_outb(mbox, ASPEED_MBOX_CTRL_RECV | ASPEED_MBOX_CTRL_MASK | ASPEED_MBOX_CTRL_SEND, ASPEED_MBOX_BMC_CTRL);
+	for (i = 0; i < mbox->configs.num_regs / 8; i++)
+		aspeed_mbox_outb(mbox, 0xff, mbox->configs.status_offset + (i * 4));
+
+	aspeed_mbox_outb(mbox,
+		ASPEED_MBOX_CTRL_RECV | ASPEED_MBOX_CTRL_MASK | ASPEED_MBOX_CTRL_SEND,
+		mbox->configs.bmc_control_offset);
 	ret = p - buf;
 
 out_unlock:
@@ -247,28 +277,29 @@ static irqreturn_t aspeed_mbox_irq(int irq, void *arg)
 	int i;
 
 	dev_dbg(mbox->miscdev.parent, "BMC_CTRL11: 0x%02x\n",
-	       aspeed_mbox_inb(mbox, ASPEED_MBOX_BMC_CTRL));
-	dev_dbg(mbox->miscdev.parent, "STATUS_0: 0x%02x\n",
-	       aspeed_mbox_inb(mbox, ASPEED_MBOX_STATUS_0));
-	dev_dbg(mbox->miscdev.parent, "STATUS_1: 0x%02x\n",
-	       aspeed_mbox_inb(mbox, ASPEED_MBOX_STATUS_1));
-	for (i = 0; i < ASPEED_MBOX_NUM_REGS; i++) {
+		aspeed_mbox_inb(mbox, mbox->configs.bmc_control_offset));
+	for (i = 0; i < mbox->configs.num_regs / 8; i++) {
+		dev_dbg(mbox->miscdev.parent, "STATUS: 0x%02x\n",
+		aspeed_mbox_inb(mbox, mbox->configs.status_offset + (i * 4)));
+	}
+	for (i = 0; i < mbox->configs.num_regs; i++) {
 		dev_dbg(mbox->miscdev.parent, "DATA_%d: 0x%02x\n", i,
-		       aspeed_mbox_inb(mbox, ASPEED_MBOX_DATA_0 + (i * 4)));
+		aspeed_mbox_inb(mbox, mbox->configs.data_offset + (i * 4)));
 	}
 
 	spin_lock(&mbox->lock);
-	for (i = 0; i < ASPEED_MBOX_NUM_REGS; i++) {
+	for (i = 0; i < mbox->configs.num_regs; i++) {
 		put_fifo_with_discard(mbox,
-				aspeed_mbox_inb(mbox, ASPEED_MBOX_DATA_0 + (i * 4)));
+				aspeed_mbox_inb(mbox, mbox->configs.data_offset + (i * 4)));
 	}
 	spin_unlock(&mbox->lock);
 #endif
 
 	/* Clear interrupt status */
-	aspeed_mbox_outb(mbox, 0xff, ASPEED_MBOX_STATUS_0);
-	aspeed_mbox_outb(mbox, 0xff, ASPEED_MBOX_STATUS_1);
-	aspeed_mbox_outb(mbox, ASPEED_MBOX_CTRL_RECV, ASPEED_MBOX_BMC_CTRL);
+	for (i = 0; i < mbox->configs.num_regs / 8; i++)
+		aspeed_mbox_outb(mbox, 0xff, mbox->configs.status_offset + (i * 4));
+
+	aspeed_mbox_outb(mbox, ASPEED_MBOX_CTRL_RECV, mbox->configs.bmc_control_offset);
 
 	wake_up(&mbox->queue);
 	return IRQ_HANDLED;
@@ -279,31 +310,42 @@ static int aspeed_mbox_config_irq(struct aspeed_mbox *mbox,
 {
 	struct device *dev = &pdev->dev;
 	int rc;
+	int i;
 	mbox->irq = platform_get_irq(pdev, 0);
 	if (!mbox->irq)
 		return -ENODEV;
 
 	rc = devm_request_irq(dev, mbox->irq, aspeed_mbox_irq,
-			      IRQF_SHARED, DEVICE_NAME, mbox);
+				IRQF_SHARED, DEVICE_NAME, mbox);
 	if (rc < 0) {
 		dev_err(dev, "Unable to request IRQ %d\n", mbox->irq);
 		return rc;
 	}
 
 	/* Disable all register based interrupts. */
-	aspeed_mbox_outb(mbox, 0xff, ASPEED_MBOX_INTERRUPT_0); /* regs 0 - 7 */
-	aspeed_mbox_outb(mbox, 0xff, ASPEED_MBOX_INTERRUPT_1); /* regs 8 - 15 */
+	for (i = 0; i < mbox->configs.num_regs / 8; i++)
+		aspeed_mbox_outb(mbox, 0xff, mbox->configs.bmc_interrupt_offset + i * 4);
 
 	/* These registers are write one to clear. Clear them. */
-	aspeed_mbox_outb(mbox, 0xff, ASPEED_MBOX_STATUS_0);
-	aspeed_mbox_outb(mbox, 0xff, ASPEED_MBOX_STATUS_1);
+	for (i = 0; i < mbox->configs.num_regs / 8; i++)
+		aspeed_mbox_outb(mbox, 0xff, mbox->configs.status_offset + i * 4);
 
-	aspeed_mbox_outb(mbox, ASPEED_MBOX_CTRL_RECV, ASPEED_MBOX_BMC_CTRL);
+	aspeed_mbox_outb(mbox, ASPEED_MBOX_CTRL_RECV, mbox->configs.bmc_control_offset);
 	return 0;
 }
 
+static const struct of_device_id aspeed_mbox_match[] = {
+	{ .compatible = "aspeed,ast2400-mbox", .data = &ast2500_config },
+	{ .compatible = "aspeed,ast2500-mbox", .data = &ast2500_config },
+	{ .compatible = "aspeed,ast2600-mbox", .data = &ast2600_config },
+	{ },
+};
+MODULE_DEVICE_TABLE(of, aspeed_mbox_match);
+
 static int aspeed_mbox_probe(struct platform_device *pdev)
 {
+	const struct aspeed_mbox_config *config;
+	const struct of_device_id *match;
 	struct aspeed_mbox *mbox;
 	struct device *dev;
 	int rc;
@@ -315,6 +357,13 @@ static int aspeed_mbox_probe(struct platform_device *pdev)
 		return -ENOMEM;
 
 	dev_set_drvdata(&pdev->dev, mbox);
+
+	match = of_match_node(aspeed_mbox_match, pdev->dev.of_node);
+	if (!match)
+		return -EINVAL;
+
+	config = match->data;
+	memcpy(&mbox->configs, config, sizeof(mbox->configs));
 
 	rc = of_property_read_u32(dev->of_node, "reg", &mbox->base);
 	if (rc) {
@@ -347,7 +396,7 @@ static int aspeed_mbox_probe(struct platform_device *pdev)
 	}
 
 	/* Create FIFO data structure */
-	rc = kfifo_alloc(&mbox->fifo, MBOX_FIFO_SIZE, GFP_KERNEL);
+	rc = kfifo_alloc(&mbox->fifo, mbox->configs.num_regs * sizeof(u32), GFP_KERNEL);
 	if (rc)
 		return rc;
 
@@ -388,14 +437,6 @@ static int aspeed_mbox_remove(struct platform_device *pdev)
 
 	return 0;
 }
-
-static const struct of_device_id aspeed_mbox_match[] = {
-	{ .compatible = "aspeed,ast2400-mbox" },
-	{ .compatible = "aspeed,ast2500-mbox" },
-	{ .compatible = "aspeed,ast2600-mbox" },
-	{ },
-};
-MODULE_DEVICE_TABLE(of, aspeed_mbox_match);
 
 static struct platform_driver aspeed_mbox_driver = {
 	.driver = {
