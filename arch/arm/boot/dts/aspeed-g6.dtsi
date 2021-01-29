@@ -613,12 +613,12 @@
 
 				lpc_host: lpc-host@80 {
 					compatible = "aspeed,ast2600-lpc-host", "simple-mfd", "syscon";
-					reg = <0x80 0x1e0>;
+					reg = <0x80 0x240>;
 					reg-io-width = <4>;
 
 					#address-cells = <1>;
 					#size-cells = <1>;
-					ranges = <0x0 0x80 0x1e0>;
+					ranges = <0x0 0x80 0x240>;
 
 					kcs4: kcs@94 {
 						compatible = "aspeed,ast2500-kcs-bmc-v2";
@@ -675,7 +675,7 @@
 
 					mbox: mbox@180 {
 						compatible = "aspeed,ast2600-mbox";
-						reg = <0x180 0x5c>;
+						reg = <0x180 0xc0>;
 						interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>;
 						#mbox-cells = <1>;
 						clocks = <&syscon ASPEED_CLK_GATE_LCLK>;
