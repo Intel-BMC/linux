@@ -502,7 +502,7 @@ static inline int peci_pcs_calc_pwr_from_eng(struct device *dev,
 	 * read was more than 60 minutes ago (jiffies did not wrap and power
 	 * calculation does not overflow or underflow).
 	 */
-	if (prev_energy->last_updated > 0 && elapsed < (HZ * 3600)) {
+	if (prev_energy->last_updated > 0 && elapsed < (HZ * 3600) && elapsed) {
 		u32 energy_consumed;
 		u64 energy_consumed_in_mJ;
 		u64 energy_by_jiffies;
