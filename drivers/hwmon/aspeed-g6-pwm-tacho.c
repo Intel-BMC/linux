@@ -22,6 +22,7 @@
 #include <linux/reset.h>
 #include <linux/regmap.h>
 #include <linux/thermal.h>
+#include <linux/pwm.h>
 
 #define ASPEED_PWM_CTRL			0x00	//PWM0 General Register
 #define ASPEED_PWM_CTRL_CH(x)		((x * 0x10) + 0x00)
@@ -445,6 +446,8 @@ struct aspeed_pwm_tachometer_data {
 	struct aspeed_tacho_channel_params *tacho_channel;
 	struct aspeed_cooling_device *cdev[8];
 	const struct attribute_group *groups[3];
+	struct pwm_chip chip;
+	u32 clk_tick_ns;
 };
 
 struct aspeed_cooling_device {
@@ -455,6 +458,11 @@ struct aspeed_cooling_device {
 	u8 *cooling_levels;
 	u8 max_state;
 	u8 cur_state;
+};
+
+struct aspeed_pwm_output_chan {
+	u32	period_ns;
+	u32	duty_ns;
 };
 
 static int regmap_aspeed_pwm_tachometer_reg_write(void *context, unsigned int reg,
@@ -955,6 +963,108 @@ static int aspeed_pwm_create_fan(struct device *dev,
 	return 0;
 }
 
+static inline
+struct aspeed_pwm_tachometer_data *to_aspeed_pwm(struct pwm_chip *chip)
+{
+	return container_of(chip, struct aspeed_pwm_tachometer_data, chip);
+}
+
+static int aspeed_pwm_request(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	struct aspeed_pwm_output_chan *chan;
+
+	chan = devm_kzalloc(chip->dev, sizeof(*chan), GFP_KERNEL);
+	if (!chan)
+		return -ENOMEM;
+
+	pwm_set_chip_data(pwm, chan);
+
+	return 0;
+}
+
+static void aspeed_pwm_free(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	devm_kfree(chip->dev, pwm_get_chip_data(pwm));
+	pwm_set_chip_data(pwm, NULL);
+}
+
+static int aspeed_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	struct aspeed_pwm_tachometer_data *priv = to_aspeed_pwm(chip);
+
+	aspeed_set_pwm_channel_enable(priv->regmap, pwm->hwpwm, true);
+
+	return 0;
+}
+
+static void aspeed_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+{
+	struct aspeed_pwm_tachometer_data *priv = to_aspeed_pwm(chip);
+
+	aspeed_set_pwm_channel_enable(priv->regmap, pwm->hwpwm, false);
+}
+
+static int aspeed_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+			     int duty_ns, int period_ns)
+{
+	struct aspeed_pwm_tachometer_data *priv = to_aspeed_pwm(chip);
+	struct aspeed_pwm_output_chan *chan = pwm_get_chip_data(pwm);
+	u8 div_h, div_l, period_value, falling_point, rising_point;
+	u32 ctrl_value, duty_value, tick_ns;
+
+	/*
+	 * We currently avoid using 64bit arithmetic by using the
+	 * fact that anything faster than 1Hz is easily representable
+	 * by 32bits.
+	 */
+	if (period_ns > NSEC_PER_SEC)
+		return -ERANGE;
+
+	if (chan->period_ns == period_ns && chan->duty_ns == duty_ns)
+		return 0;
+
+	for (div_l = 0; div_l <= 0xff; div_l++) {
+		for (div_h = 0; div_h <= 0xf; div_h++) {
+			tick_ns = priv->clk_tick_ns * BIT(div_h) * (div_l + 1);
+			if (tick_ns * PWM_PERIOD_MAX >= period_ns)
+				break;
+		}
+		if (tick_ns * PWM_PERIOD_MAX >= period_ns)
+			break;
+	}
+
+	if (period_ns / tick_ns > PWM_PERIOD_MAX)
+		return -ERANGE;
+
+	ctrl_value = div_h << 8 | div_l;
+	period_value = period_ns / tick_ns;
+	falling_point = 0;
+	rising_point = duty_ns / tick_ns;
+	duty_value = period_value << PWM_PERIOD_BIT |
+		     falling_point << PWM_RISING_RISING_BIT |
+		     rising_point << PWM_RISING_FALLING_BIT;
+
+	regmap_update_bits(priv->regmap, ASPEED_PWM_DUTY_CYCLE_CH(pwm->hwpwm),
+			   PWM_PERIOD_BIT_MASK | PWM_RISING_FALLING_MASK,
+			   duty_value);
+	regmap_update_bits(priv->regmap, ASPEED_PWM_CTRL_CH(pwm->hwpwm),
+			   PWM_CLK_DIV_H_MASK | PWM_CLK_DIV_L_MASK, ctrl_value);
+
+	chan->period_ns = period_ns;
+	chan->duty_ns = duty_ns;
+
+	return 0;
+}
+
+static const struct pwm_ops aspeed_pwm_ops = {
+	.request	= aspeed_pwm_request,
+	.free		= aspeed_pwm_free,
+	.enable		= aspeed_pwm_enable,
+	.disable	= aspeed_pwm_disable,
+	.config		= aspeed_pwm_config,
+	.owner		= THIS_MODULE,
+};
+
 static int aspeed_pwm_tachometer_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
@@ -989,6 +1099,7 @@ static int aspeed_pwm_tachometer_probe(struct platform_device *pdev)
 	if (IS_ERR(clk))
 		return -ENODEV;
 	priv->clk_freq = clk_get_rate(clk);
+	priv->clk_tick_ns = NSEC_PER_SEC / priv->clk_freq;
 
 	priv->reset = devm_reset_control_get(&pdev->dev, NULL);
 	if (IS_ERR(priv->reset)) {
@@ -1006,6 +1117,19 @@ static int aspeed_pwm_tachometer_probe(struct platform_device *pdev)
 			of_node_put(child);
 			return ret;
 		}
+	}
+
+	priv->chip.dev = &pdev->dev;
+	priv->chip.ops = &aspeed_pwm_ops;
+	priv->chip.base = -1;
+	priv->chip.npwm = 16;
+	priv->chip.of_xlate = of_pwm_xlate_with_flags;
+	priv->chip.of_pwm_n_cells = 3;
+
+	ret = pwmchip_add(&priv->chip);
+	if (ret < 0) {
+		dev_err(dev, "failed to register PWM chip\n");
+		return ret;
 	}
 
 	priv->groups[0] = &pwm_dev_group;
