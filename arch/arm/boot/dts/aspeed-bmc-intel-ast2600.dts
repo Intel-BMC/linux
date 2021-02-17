@@ -127,11 +127,11 @@
 			gpios = <&sgpio ASPEED_GPIO(D, 3) GPIO_ACTIVE_HIGH>;
 		};
 	};
-/*
+
 	beeper {
 		compatible = "pwm-beeper";
-		pwms = <&timer 7 1000000 0>;
-	}; */
+		pwms = <&pwm_tacho 7 1000000 0>;
+	};
 };
 
 &fmc {
@@ -708,6 +708,8 @@
 
 &pwm_tacho {
 	status = "okay";
+	#pwm-cells = <3>;
+	aspeed,pwm-outputs = <7>;
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_pwm0_default &pinctrl_tach0_default
 			&pinctrl_pwm1_default &pinctrl_tach1_default
@@ -718,7 +720,8 @@
 			&pinctrl_pwm12g1_default &pinctrl_tach6_default
 			&pinctrl_pwm13g1_default &pinctrl_tach7_default
 			&pinctrl_pwm14g1_default &pinctrl_tach8_default
-			&pinctrl_pwm15g1_default &pinctrl_tach9_default>; /*pwm 6-11 used for some other functionality on archer city*/
+			&pinctrl_pwm15g1_default &pinctrl_tach9_default
+			&pinctrl_pwm7_default>;
 
 	fan@0 {
 		reg = <0x00>;
