@@ -3,6 +3,7 @@
 
 #include <linux/bitfield.h>
 #include <linux/crc8.h>
+#include <linux/delay.h>
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -192,7 +193,7 @@ static int peci_aw_fcs(struct peci_xfer_msg *msg, int len, u8 *aw_fcs)
 static int __peci_xfer(struct peci_adapter *adapter, struct peci_xfer_msg *msg,
 		       bool do_retry, bool has_aw_fcs)
 {
-	uint interval_ms = PECI_DEV_RETRY_INTERVAL_MIN_MSEC;
+	uint interval_us = PECI_DEV_RETRY_INTERVAL_MIN_USEC;
 	ulong timeout = jiffies;
 	u8 aw_fcs;
 	int ret;
@@ -256,15 +257,11 @@ static int __peci_xfer(struct peci_adapter *adapter, struct peci_xfer_msg *msg,
 			break;
 		}
 
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (schedule_timeout(msecs_to_jiffies(interval_ms))) {
-			ret = -EINTR;
-			break;
-		}
+		usleep_range(interval_us, interval_us * 2);
 
-		interval_ms *= 2;
-		if (interval_ms > PECI_DEV_RETRY_INTERVAL_MAX_MSEC)
-			interval_ms = PECI_DEV_RETRY_INTERVAL_MAX_MSEC;
+		interval_us *= 2;
+		if (interval_us > PECI_DEV_RETRY_INTERVAL_MAX_USEC)
+			interval_us = PECI_DEV_RETRY_INTERVAL_MAX_USEC;
 	}
 
 	if (ret)
