@@ -41,28 +41,28 @@ struct aspeed_i3c_global {
 	struct reset_control	*rst;
 };
 
-static const struct of_device_id aspeed_i3c_of_match[] = {
+static const struct of_device_id aspeed_i3c_global_of_table[] = {
 	{ .compatible = "aspeed,ast2600-i3c-global", },
 	{},
 };
+MODULE_DEVICE_TABLE(of, aspeed_i3c_global_of_table);
 
 static int aspeed_i3c_global_probe(struct platform_device *pdev)
 {
 	struct aspeed_i3c_global *i3c_global;
-	struct device_node *node = pdev->dev.of_node;
 	union i3c_set_reg reg;
 	int i, ret;
 	u32 num_of_i3cs;
 
-	i3c_global = kzalloc(sizeof(*i3c_global), GFP_KERNEL);
+	i3c_global = devm_kzalloc(&pdev->dev, sizeof(*i3c_global), GFP_KERNEL);
 	if (!i3c_global)
 		return -ENOMEM;
 
-	i3c_global->base = of_iomap(node, 0);
-	if (!i3c_global->base)
-		return -ENOMEM;
+	i3c_global->base = devm_platform_ioremap_resource(pdev, 0);
+	if (IS_ERR(i3c_global->base))
+		return PTR_ERR(i3c_global->base);
 
-	i3c_global->rst = devm_reset_control_get_exclusive(&pdev->dev, NULL);
+	i3c_global->rst = devm_reset_control_get(&pdev->dev, NULL);
 	if (IS_ERR(i3c_global->rst)) {
 		dev_err(&pdev->dev,
 			"missing or invalid reset controller device tree entry");
@@ -87,6 +87,8 @@ static int aspeed_i3c_global_probe(struct platform_device *pdev)
 	for (i = 0; i < num_of_i3cs; i++)
 		writel(reg.value, i3c_global->base + ASPEED_I3CG_SET(i));
 
+	dev_info(&pdev->dev, "i3c global control registered\n");
+
 	return 0;
 }
 
@@ -94,15 +96,10 @@ static struct platform_driver aspeed_i3c_driver = {
 	.probe  = aspeed_i3c_global_probe,
 	.driver = {
 		.name = KBUILD_MODNAME,
-		.of_match_table = aspeed_i3c_of_match,
+		.of_match_table = of_match_ptr(aspeed_i3c_global_of_table),
 	},
 };
-
-static int __init aspeed_i3c_global_init(void)
-{
-	return platform_driver_register(&aspeed_i3c_driver);
-}
-postcore_initcall(aspeed_i3c_global_init);
+module_platform_driver(aspeed_i3c_driver);
 
 MODULE_AUTHOR("Ryan Chen");
 MODULE_DESCRIPTION("ASPEED I3C Global Driver");
