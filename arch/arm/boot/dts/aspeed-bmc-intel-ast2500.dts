@@ -185,6 +185,13 @@
 			reg-width = <64>;
 			hash-data = "d44f9b804976fa23c2e25d62f16154d26520a7e24c5555095fd1b55c027804f1570dcd16189739c640cd7d9a6ce14944a2c4eaf1dc429eed6940e8a83498a474";
 		};
+		silicon_id {
+			offset = <0x7c>;
+			bit-mask = <0xffffffff>;
+			bit-shift = <0>;
+			read-only;
+			reg-width = <32>;
+		};
 	};
 };
 
