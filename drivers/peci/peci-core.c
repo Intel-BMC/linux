@@ -390,14 +390,9 @@ static int peci_cmd_xfer(struct peci_adapter *adapter, void *vmsg)
 		ret = peci_xfer(adapter, msg);
 	} else {
 		switch (msg->tx_buf[0]) {
-		case PECI_RDPKGCFG_CMD:
-		case PECI_RDIAMSR_CMD:
-		case PECI_RDIAMSREX_CMD:
-		case PECI_RDPCICFG_CMD:
-		case PECI_RDPCICFGLOCAL_CMD:
-		case PECI_RDENDPTCFG_CMD:
-		case PECI_CRASHDUMP_CMD:
-			ret = peci_xfer_with_retries(adapter, msg, false);
+		case PECI_GET_DIB_CMD:
+		case PECI_GET_TEMP_CMD:
+			ret = peci_xfer(adapter, msg);
 			break;
 		case PECI_WRPKGCFG_CMD:
 		case PECI_WRIAMSR_CMD:
@@ -417,10 +412,8 @@ static int peci_cmd_xfer(struct peci_adapter *adapter, void *vmsg)
 
 			ret = peci_xfer_with_retries(adapter, msg, true);
 			break;
-		case PECI_GET_DIB_CMD:
-		case PECI_GET_TEMP_CMD:
 		default:
-			ret = peci_xfer(adapter, msg);
+			ret = peci_xfer_with_retries(adapter, msg, false);
 			break;
 		}
 	}
