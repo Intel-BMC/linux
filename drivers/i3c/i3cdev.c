@@ -32,7 +32,7 @@ struct i3cdev_data {
 
 static DEFINE_IDA(i3cdev_ida);
 static dev_t i3cdev_number;
-#define I3C_MINORS 16 /* 16 I3C devices supported for now */
+#define I3C_MINORS 32 /* 32 I3C devices supported for now */
 
 static LIST_HEAD(i3cdev_list);
 static DEFINE_SPINLOCK(i3cdev_list_lock);

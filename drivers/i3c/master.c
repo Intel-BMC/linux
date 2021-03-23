@@ -1495,13 +1495,20 @@ static int i3c_master_early_i3c_dev_add(struct i3c_master_controller *master,
 	if (ret)
 		goto err_free_dev;
 
-	ret = i3c_master_setdasa_locked(master, i3cdev->info.static_addr,
+	if (master->jdec_spd) {
+		i3cdev->info.dyn_addr = i3cdev->boardinfo->init_dyn_addr;
+		ret = i3c_master_reattach_i3c_dev(i3cdev,
+					i3cdev->info.static_addr);
+	} else {
+		ret = i3c_master_setdasa_locked(master,
+					i3cdev->info.static_addr,
 					i3cdev->boardinfo->init_dyn_addr);
-	if (ret)
-		goto err_detach_dev;
+		if (ret)
+			goto err_detach_dev;
 
-	i3cdev->info.dyn_addr = i3cdev->boardinfo->init_dyn_addr;
-	ret = i3c_master_reattach_i3c_dev(i3cdev, 0);
+		i3cdev->info.dyn_addr = i3cdev->boardinfo->init_dyn_addr;
+		ret = i3c_master_reattach_i3c_dev(i3cdev, 0);
+	}
 	if (ret)
 		goto err_rstdaa;
 
@@ -1810,9 +1817,10 @@ static int i3c_master_bus_init(struct i3c_master_controller *master)
 			goto err_rstdaa;
 		}
 
-		i3c_bus_set_addr_slot_status(&master->bus,
-					     i3cboardinfo->init_dyn_addr,
-					     I3C_ADDR_SLOT_I3C_DEV);
+		if (i3cboardinfo->static_addr != i3cboardinfo->init_dyn_addr)
+			i3c_bus_set_addr_slot_status(&master->bus,
+						i3cboardinfo->init_dyn_addr,
+						I3C_ADDR_SLOT_I3C_DEV);
 
 		/*
 		 * Only try to create/attach devices that have a static
@@ -1824,13 +1832,15 @@ static int i3c_master_bus_init(struct i3c_master_controller *master)
 
 		if (i3cboardinfo->static_addr)
 			i3c_master_early_i3c_dev_add(master, i3cboardinfo);
+
+		n_i3cdev++;
 	}
 
 	/*
 	 * Since SPD devices are all with static address.  Don't do DAA if we
 	 * know it is a pure I2C bus.
 	 */
-	if ((master->jdec_spd) && (n_i3cdev == 0))
+	if (master->jdec_spd && n_i3cdev == 0)
 		return 0;
 
 	ret = i3c_master_do_daa(master);
@@ -2165,9 +2175,8 @@ static int of_populate_i3c_bus(struct i3c_master_controller *master)
 	if (!i3cbus_np)
 		return 0;
 
-	if (of_get_property(i3cbus_np, "jdec-spd", NULL)) {
+	if (of_get_property(i3cbus_np, "jdec-spd", NULL))
 		master->jdec_spd = 1;
-	}
 
 	for_each_available_child_of_node(i3cbus_np, node) {
 		ret = of_i3c_master_add_dev(master, node);
