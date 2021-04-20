@@ -864,11 +864,6 @@
 	};
 };
 
-&gfx {
-	status = "okay";
-	memory-region = <&gfx_memory>;
-};
-
 &pcieh {
 	status = "okay";
 };
