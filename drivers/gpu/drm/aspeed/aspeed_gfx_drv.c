@@ -113,14 +113,8 @@ static int aspeed_gfx_load(struct drm_device *drm)
 
 	priv->scu = syscon_regmap_lookup_by_compatible("aspeed,ast2500-scu");
 	if (IS_ERR(priv->scu)) {
-		priv->scu = syscon_regmap_lookup_by_compatible("aspeed,ast2600-scu");
-		if (IS_ERR(priv->scu)) {
-			dev_err(&pdev->dev, "failed to find SCU regmap\n");
-			return PTR_ERR(priv->scu);
-		}
-		priv->scu_misc_offset = SCU_MISC_AST2600;
-	} else {
-		priv->scu_misc_offset = SCU_MISC_AST2500;
+		dev_err(&pdev->dev, "failed to find SCU regmap\n");
+		return PTR_ERR(priv->scu);
 	}
 
 	ret = of_reserved_mem_device_init(drm->dev);
@@ -137,9 +131,12 @@ static int aspeed_gfx_load(struct drm_device *drm)
 	}
 
 	priv->rst = devm_reset_control_get_exclusive(&pdev->dev, NULL);
-	if (!IS_ERR_OR_NULL(priv->rst)) {
-		reset_control_deassert(priv->rst);
+	if (IS_ERR(priv->rst)) {
+		dev_err(&pdev->dev,
+			"missing or invalid reset controller device tree entry");
+		return PTR_ERR(priv->rst);
 	}
+	reset_control_deassert(priv->rst);
 
 	priv->clk = devm_clk_get(drm->dev, NULL);
 	if (IS_ERR(priv->clk)) {
@@ -212,7 +209,6 @@ static struct drm_driver aspeed_gfx_driver = {
 
 static const struct of_device_id aspeed_gfx_match[] = {
 	{ .compatible = "aspeed,ast2500-gfx" },
-	{ .compatible = "aspeed,ast2600-gfx" },
 	{ }
 };
 
