@@ -31,6 +31,8 @@
 #define UART_ROUTING_UART6	"uart6"
 #define UART_ROUTING_UART10	"uart10"
 #define UART_ROUTING_RES	"reserved"
+#define UART_ROUTING_HICR9_RAW	"hicr9"
+#define UART_ROUTING_HICRA_RAW	"hicra"
 
 struct aspeed_uart_routing {
 	struct regmap *map;
@@ -40,7 +42,7 @@ struct aspeed_uart_routing {
 struct aspeed_uart_routing_selector {
 	struct device_attribute	dev_attr;
 	uint8_t reg;
-	uint8_t mask;
+	uint32_t mask;
 	uint8_t shift;
 	const char *const options[];
 };
@@ -62,6 +64,22 @@ static ssize_t aspeed_uart_routing_store(struct device *dev,
 	.show = aspeed_uart_routing_show,			\
 	.store = aspeed_uart_routing_store,			\
 }
+
+static struct aspeed_uart_routing_selector hicr9_raw_sel = {
+	.dev_attr = ROUTING_ATTR(UART_ROUTING_HICR9_RAW),
+	.reg = HICR9,
+	.shift = 0,
+	.mask = 0xffffffff,
+	.options = { NULL },
+};
+
+static struct aspeed_uart_routing_selector hicra_raw_sel = {
+	.dev_attr = ROUTING_ATTR(UART_ROUTING_HICRA_RAW),
+	.reg = HICRA,
+	.shift = 0,
+	.mask = 0xffffffff,
+	.options = { NULL },
+};
 
 /* routing selector for AST25xx */
 static struct aspeed_uart_routing_selector ast2500_io6_sel = {
@@ -278,6 +296,8 @@ static struct attribute *ast2500_uart_routing_attrs[] = {
 	&ast2500_io3_sel.dev_attr.attr,
 	&ast2500_io2_sel.dev_attr.attr,
 	&ast2500_io1_sel.dev_attr.attr,
+	&hicr9_raw_sel.dev_attr.attr,
+	&hicra_raw_sel.dev_attr.attr,
 	NULL,
 };
 
@@ -482,6 +502,8 @@ static struct attribute *ast2600_uart_routing_attrs[] = {
 	&ast2600_io3_sel.dev_attr.attr,
 	&ast2600_io2_sel.dev_attr.attr,
 	&ast2600_io1_sel.dev_attr.attr,
+	&hicr9_raw_sel.dev_attr.attr,
+	&hicra_raw_sel.dev_attr.attr,
 	NULL,
 };
 
@@ -495,21 +517,26 @@ static ssize_t aspeed_uart_routing_show(struct device *dev,
 {
 	struct aspeed_uart_routing *uart_routing = dev_get_drvdata(dev);
 	struct aspeed_uart_routing_selector *sel = to_routing_selector(attr);
-	int val, pos, len;
+	int val, pos, len = 0;
 
 	regmap_read(uart_routing->map, sel->reg, &val);
 	val = (val >> sel->shift) & sel->mask;
 
-	len = 0;
-	for (pos = 0; sel->options[pos] != NULL; ++pos) {
-		if (pos == val)
-			len += sysfs_emit_at(buf, len, "[%s] ", sel->options[pos]);
-		else
-			len += sysfs_emit_at(buf, len, "%s ", sel->options[pos]);
-	}
+	if (sel == &hicr9_raw_sel || sel == &hicra_raw_sel) {
+		len += sysfs_emit_at(buf, len, "0x%08x", val);
+	} else {
+		for (pos = 0; sel->options[pos] != NULL; ++pos) {
+			if (pos == val)
+				len += sysfs_emit_at(buf, len, "[%s] ",
+						     sel->options[pos]);
+			else
+				len += sysfs_emit_at(buf, len, "%s ",
+						     sel->options[pos]);
+		}
 
-	if (val >= pos)
-		len += sysfs_emit_at(buf, len, "[unknown(%d)]", val);
+		if (val >= pos)
+			len += sysfs_emit_at(buf, len, "[unknown(%d)]", val);
+	}
 
 	len += sysfs_emit_at(buf, len, "\n");
 
@@ -522,12 +549,19 @@ static ssize_t aspeed_uart_routing_store(struct device *dev,
 {
 	struct aspeed_uart_routing *uart_routing = dev_get_drvdata(dev);
 	struct aspeed_uart_routing_selector *sel = to_routing_selector(attr);
-	int val;
+	int val, res;
+	char end;
 
-	val = match_string(sel->options, -1, buf);
-	if (val < 0) {
-		dev_err(dev, "invalid value \"%s\"\n", buf);
-		return -EINVAL;
+	if (sel == &hicr9_raw_sel || sel == &hicra_raw_sel) {
+		res = sscanf(buf, "%i%c", &val, &end);
+		if (res < 1 || (res > 1 && end != '\n'))
+			return -EINVAL;
+	} else {
+		val = match_string(sel->options, -1, buf);
+		if (val < 0) {
+			dev_err(dev, "invalid value \"%s\"\n", buf);
+			return -EINVAL;
+		}
 	}
 
 	regmap_update_bits(uart_routing->map, sel->reg,
