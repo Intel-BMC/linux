@@ -40,6 +40,7 @@
 #define ASPEED_HICRA_UART3	"uart3"
 #define ASPEED_HICRA_UART4	"uart4"
 #define ASPEED_HICRA_UART5	"uart5"
+#define ASPEED_HICRA_RAW	"raw"
 
 struct aspeed_uart_routing {
 	struct device		*dev;
@@ -72,6 +73,15 @@ static ssize_t aspeed_uart_routing_store(struct device *dev,
 	.show = aspeed_uart_routing_show,				\
 	.store = aspeed_uart_routing_store,				\
 }
+
+static struct aspeed_uart_routing_selector raw_sel = {
+	.dev_attr = ROUTING_ATTR(ASPEED_HICRA_RAW),
+	.shift = 0,
+	.mask = 0xffffffff,
+	.options = {
+		    NULL                // NULL termination
+		    },
+};
 
 static struct aspeed_uart_routing_selector uart5_sel = {
 	.dev_attr = ROUTING_ATTR(ASPEED_HICRA_UART5),
@@ -257,6 +267,7 @@ static struct attribute *aspeed_uart_routing_attrs[] = {
 	&io3_sel.dev_attr.attr,
 	&io4_sel.dev_attr.attr,
 	&io5_sel.dev_attr.attr,
+	&raw_sel.dev_attr.attr,
 	NULL,
 };
 
@@ -270,27 +281,30 @@ static ssize_t aspeed_uart_routing_show(struct device *dev,
 {
 	struct aspeed_uart_routing *uart_routing = dev_get_drvdata(dev);
 	struct aspeed_uart_routing_selector *sel = to_routing_selector(attr);
-	int val, pos, len;
+	int val, pos, len = 0;
 
 	val = (readl(uart_routing->regs) >> sel->shift) & sel->mask;
 
-	len = 0;
-	for (pos = 0; sel->options[pos] != NULL; ++pos) {
-		if (pos == val) {
-			len += snprintf(buf + len, PAGE_SIZE - 1 - len,
-					"[%s] ", sel->options[pos]);
-		} else {
-			len += snprintf(buf + len, PAGE_SIZE - 1 - len,
-					"%s ", sel->options[pos]);
+	if (sel == &raw_sel) {
+		len += snprintf(buf, PAGE_SIZE - 1, "0x%08x\n", val);
+	} else {
+		for (pos = 0; sel->options[pos] != NULL; ++pos) {
+			if (pos == val) {
+				len += snprintf(buf + len, PAGE_SIZE - 1 - len,
+						"[%s] ", sel->options[pos]);
+			} else {
+				len += snprintf(buf + len, PAGE_SIZE - 1 - len,
+						"%s ", sel->options[pos]);
+			}
 		}
-	}
 
-	if (val >= pos) {
-		len += snprintf(buf + len, PAGE_SIZE - 1 - len,
-				"[unknown(%d)]", val);
-	}
+		if (val >= pos) {
+			len += snprintf(buf + len, PAGE_SIZE - 1 - len,
+					"[unknown(%d)]", val);
+		}
 
-	len += snprintf(buf + len, PAGE_SIZE - 1 - len, "\n");
+		len += snprintf(buf + len, PAGE_SIZE - 1 - len, "\n");
+	}
 
 	return len;
 }
@@ -301,13 +315,20 @@ static ssize_t aspeed_uart_routing_store(struct device *dev,
 {
 	struct aspeed_uart_routing *uart_routing = dev_get_drvdata(dev);
 	struct aspeed_uart_routing_selector *sel = to_routing_selector(attr);
-	int val;
+	int val, res;
+	char end;
 	u32 reg;
 
-	val = match_string(sel->options, -1, buf);
-	if (val < 0) {
-		dev_err(dev, "invalid value \"%s\"\n", buf);
-		return -EINVAL;
+	if (sel == &raw_sel) {
+		res = sscanf(buf, "%i%c", &val, &end);
+		if (res < 1 || (res > 1 && end != '\n'))
+			return -EINVAL;
+	} else {
+		val = match_string(sel->options, -1, buf);
+		if (val < 0) {
+			dev_err(dev, "invalid value \"%s\"\n", buf);
+			return -EINVAL;
+		}
 	}
 
 	spin_lock(&uart_routing->lock);
