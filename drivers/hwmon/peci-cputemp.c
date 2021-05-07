@@ -10,8 +10,8 @@
 #include "peci-hwmon.h"
 
 #define DEFAULT_CHANNEL_NUMS	5
-#define CORETEMP_CHANNEL_NUMS	CORE_MASK_BITS_MAX
-#define CPUTEMP_CHANNEL_NUMS	(DEFAULT_CHANNEL_NUMS + CORETEMP_CHANNEL_NUMS)
+#define MODTEMP_CHANNEL_NUMS	CORE_MASK_BITS_MAX
+#define CPUTEMP_CHANNEL_NUMS	(DEFAULT_CHANNEL_NUMS + MODTEMP_CHANNEL_NUMS)
 
 struct temp_group {
 	struct peci_sensor_data		die;
@@ -19,7 +19,7 @@ struct temp_group {
 	struct peci_sensor_data		tcontrol;
 	struct peci_sensor_data		tthrottle;
 	struct peci_sensor_data		tjmax;
-	struct peci_sensor_data		core[CORETEMP_CHANNEL_NUMS];
+	struct peci_sensor_data		module[MODTEMP_CHANNEL_NUMS];
 };
 
 struct peci_cputemp {
@@ -34,7 +34,7 @@ struct peci_cputemp {
 	struct hwmon_channel_info	temp_info;
 	const struct hwmon_channel_info	*info[2];
 	struct hwmon_chip_info		chip;
-	char				**coretemp_label;
+	char				**module_temp_label;
 };
 
 enum cputemp_channels {
@@ -46,7 +46,7 @@ enum cputemp_channels {
 	channel_core,
 };
 
-static const u32 config_table[DEFAULT_CHANNEL_NUMS + 1] = {
+static const u32 config_table[] = {
 	/* Die temperature */
 	HWMON_T_LABEL | HWMON_T_INPUT | HWMON_T_MAX | HWMON_T_CRIT |
 	HWMON_T_CRIT_HYST,
@@ -178,25 +178,25 @@ static int get_dts(struct peci_cputemp *priv)
 	return 0;
 }
 
-static int get_core_temp(struct peci_cputemp *priv, int core_index)
+static int get_module_temp(struct peci_cputemp *priv, int index)
 {
-	s32 core_dts_margin;
+	s32 module_dts_margin;
 	u8  pkg_cfg[4];
 	int ret;
 
-	if (!peci_sensor_need_update(&priv->temp.core[core_index]))
+	if (!peci_sensor_need_update(&priv->temp.module[index]))
 		return 0;
 
 	ret = peci_client_read_package_config(priv->mgr,
-					      PECI_MBX_INDEX_PER_CORE_DTS_TEMP,
-					      core_index, pkg_cfg);
+					      PECI_MBX_INDEX_MODULE_TEMP,
+					      index, pkg_cfg);
 	if (ret)
 		return ret;
 
-	core_dts_margin = le16_to_cpup((__le16 *)pkg_cfg);
+	module_dts_margin = le16_to_cpup((__le16 *)pkg_cfg);
 
 	/*
-	 * Processors return a value of the core DTS reading in 10.6 format
+	 * Processors return a value of the DTS reading in 10.6 format
 	 * (10 bits signed decimal, 6 bits fractional).
 	 * Error codes:
 	 *   0x8000: General sensor error
@@ -204,16 +204,16 @@ static int get_core_temp(struct peci_cputemp *priv, int core_index)
 	 *   0x8002: Underflow on reading value
 	 *   0x8003-0x81ff: Reserved
 	 */
-	if (core_dts_margin >= 0x8000 && core_dts_margin <= 0x81ff)
+	if (module_dts_margin >= 0x8000 && module_dts_margin <= 0x81ff)
 		return -EIO;
 
-	core_dts_margin = ten_dot_six_to_millidegree(core_dts_margin);
+	module_dts_margin = ten_dot_six_to_millidegree(module_dts_margin);
 
 	/* Note that the tjmax should be available before calling it */
-	priv->temp.core[core_index].value = priv->temp.tjmax.value +
-					    core_dts_margin;
+	priv->temp.module[index].value = priv->temp.tjmax.value +
+					 module_dts_margin;
 
-	peci_sensor_mark_updated(&priv->temp.core[core_index]);
+	peci_sensor_mark_updated(&priv->temp.module[index]);
 
 	return 0;
 }
@@ -229,8 +229,8 @@ static int cputemp_read_string(struct device *dev,
 
 	*str = (channel < DEFAULT_CHANNEL_NUMS) ?
 	       cputemp_label[channel] :
-	       (const char *)priv->coretemp_label[channel -
-						  DEFAULT_CHANNEL_NUMS];
+	       (const char *)priv->module_temp_label[channel -
+						     DEFAULT_CHANNEL_NUMS];
 
 	return 0;
 }
@@ -240,7 +240,7 @@ static int cputemp_read(struct device *dev,
 			u32 attr, int channel, long *val)
 {
 	struct peci_cputemp *priv = dev_get_drvdata(dev);
-	int ret, core_index;
+	int ret, module_index;
 
 	if (channel >= CPUTEMP_CHANNEL_NUMS ||
 	    !(priv->temp_config[channel] & BIT(attr)))
@@ -277,12 +277,12 @@ static int cputemp_read(struct device *dev,
 			*val = priv->temp.tjmax.value;
 			break;
 		default:
-			core_index = channel - DEFAULT_CHANNEL_NUMS;
-			ret = get_core_temp(priv, core_index);
+			module_index = channel - DEFAULT_CHANNEL_NUMS;
+			ret = get_module_temp(priv, module_index);
 			if (ret)
 				break;
 
-			*val = priv->temp.core[core_index].value;
+			*val = priv->temp.module[module_index].value;
 			break;
 		}
 		break;
@@ -392,20 +392,20 @@ static int check_resolved_cores(struct peci_cputemp *priv)
 	return 0;
 }
 
-static int create_core_temp_label(struct peci_cputemp *priv, int idx)
+static int create_module_temp_label(struct peci_cputemp *priv, int idx)
 {
-	priv->coretemp_label[idx] = devm_kzalloc(priv->dev,
-						 PECI_HWMON_LABEL_STR_LEN,
-						 GFP_KERNEL);
-	if (!priv->coretemp_label[idx])
+	priv->module_temp_label[idx] = devm_kzalloc(priv->dev,
+						    PECI_HWMON_LABEL_STR_LEN,
+						    GFP_KERNEL);
+	if (!priv->module_temp_label[idx])
 		return -ENOMEM;
 
-	sprintf(priv->coretemp_label[idx], "Core %d", idx);
+	sprintf(priv->module_temp_label[idx], "Core %d", idx);
 
 	return 0;
 }
 
-static int create_core_temp_info(struct peci_cputemp *priv)
+static int create_module_temp_info(struct peci_cputemp *priv)
 {
 	int ret, i;
 
@@ -413,23 +413,22 @@ static int create_core_temp_info(struct peci_cputemp *priv)
 	if (ret)
 		return ret;
 
-	priv->coretemp_label = devm_kzalloc(priv->dev,
-					    priv->gen_info->core_mask_bits *
-					    sizeof(char *),
-					    GFP_KERNEL);
-	if (!priv->coretemp_label)
+	priv->module_temp_label = devm_kzalloc(priv->dev,
+					       MODTEMP_CHANNEL_NUMS *
+					       sizeof(char *),
+					       GFP_KERNEL);
+	if (!priv->module_temp_label)
 		return -ENOMEM;
 
-	for (i = 0; i < priv->gen_info->core_mask_bits; i++)
-		if (priv->core_mask & BIT(i)) {
-			while (priv->config_idx <= i + DEFAULT_CHANNEL_NUMS)
-				priv->temp_config[priv->config_idx++] =
-					config_table[channel_core];
+	for (i = 0; i < MODTEMP_CHANNEL_NUMS; i++) {
+		priv->temp_config[priv->config_idx++] = config_table[channel_core];
 
-			ret = create_core_temp_label(priv, i);
+		if (i < priv->gen_info->core_mask_bits && priv->core_mask & BIT(i)) {
+			ret = create_module_temp_label(priv, i);
 			if (ret)
 				return ret;
 		}
+	}
 
 	return 0;
 }
@@ -465,7 +464,7 @@ static int peci_cputemp_probe(struct platform_device *pdev)
 	priv->temp_config[priv->config_idx++] = config_table[channel_tthrottle];
 	priv->temp_config[priv->config_idx++] = config_table[channel_tjmax];
 
-	ret = create_core_temp_info(priv);
+	ret = create_module_temp_info(priv);
 	if (ret)
 		dev_dbg(dev, "Skipped creating core temp info\n");
 
