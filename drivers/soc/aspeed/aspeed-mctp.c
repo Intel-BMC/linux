@@ -716,7 +716,6 @@ struct mctp_pcie_packet *aspeed_mctp_receive_packet(struct mctp_client *client,
 						    unsigned long timeout)
 {
 	struct aspeed_mctp *priv = client->priv;
-	struct mctp_pcie_packet *packet;
 	int ret;
 
 	if (priv->pcie.bdf == 0)
@@ -738,7 +737,7 @@ void aspeed_mctp_flush_rx_queue(struct mctp_client *client)
 {
 	struct mctp_pcie_packet *packet;
 
-	while (packet = ptr_ring_consume_bh(&client->rx_queue))
+	while ((packet = ptr_ring_consume_bh(&client->rx_queue)))
 		aspeed_mctp_packet_free(packet);
 }
 EXPORT_SYMBOL_GPL(aspeed_mctp_flush_rx_queue);
