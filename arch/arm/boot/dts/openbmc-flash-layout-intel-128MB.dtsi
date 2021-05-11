@@ -43,8 +43,27 @@ partitions {
 	};
 
 	image-staging@4a00000 {
-		reg = <0x4a00000 0x3600000>;
+		reg = <0x4a00000 0x3400000>;
 		label = "image-stg";
 	};
 
+	afm-active@7e00000 {
+		reg = <0x7e00000 0x20000>;
+		label = "afm-active";
+	};
+
+	afm-recovery@7e20000 {
+		reg = <0x7e20000 0x20000>;
+		label = "afm-rcvr";
+	};
+
+	reserved@7e40000 {
+		reg = <0x7e40000 0xc0000>;
+		label = "rsvrd";
+	};
+
+	cpld-gold@7f00000 {
+		reg = <0x7f00000 0x100000>;
+		label = "cpld-gold";
+	};
 };
