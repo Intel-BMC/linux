@@ -2204,6 +2204,15 @@ F:	drivers/*/*npcm*
 F:	drivers/*/*/*npcm*
 F:	include/dt-bindings/clock/nuvoton,npcm7xx-clock.h
 
+ARM/NUVOTON WPCM450 ARCHITECTURE
+M:	Jonathan Neuschäfer <j.neuschaefer@gmx.net>
+L:	openbmc@lists.ozlabs.org (moderated for non-subscribers)
+S:	Maintained
+F:	Documentation/devicetree/bindings/*/*wpcm*
+F:	arch/arm/boot/dts/nuvoton-wpcm450*
+F:	arch/arm/mach-npcm/wpcm450.c
+F:	drivers/*/*wpcm*
+
 ARM/OPENMOKO NEO FREERUNNER (GTA02) MACHINE SUPPORT
 L:	openmoko-kernel@lists.openmoko.org (subscribers-only)
 S:	Orphan
@@ -6708,6 +6717,7 @@ F:	Documentation/filesystems/f2fs.rst
 F:	fs/f2fs/
 F:	include/linux/f2fs_fs.h
 F:	include/trace/events/f2fs.h
+F:	include/uapi/linux/f2fs.h
 
 F71805F HARDWARE MONITORING DRIVER
 M:	Jean Delvare <jdelvare@suse.com>
