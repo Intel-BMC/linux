@@ -18,10 +18,10 @@
 #include <linux/uaccess.h>
 #include <linux/wait.h>
 
-#define LPC_HICRB            0x080
+#define LPC_HICRB            0x100
 #define     LPC_HICRB_IBFIF4         BIT(1)
 #define     LPC_HICRB_LPC4E          BIT(0)
-#define LPC_HICRC            0x084
+#define LPC_HICRC            0x104
 #define     LPC_KCS4_IRQSEL_MASK     GENMASK(7, 4)
 #define     LPC_KCS4_IRQSEL_SHIFT    4
 #define     LPC_KCS4_IRQTYPE_MASK    GENMASK(3, 2)
@@ -32,10 +32,10 @@
 #define     LPC_KCS4_IRQTYPE_RISING  0b11
 #define     LPC_KCS4_OBF4_AUTO_CLR   BIT(1)
 #define     LPC_KCS4_IRQ_HOST	     BIT(0)
-#define LPC_LADR4            0x090
-#define LPC_IDR4             0x094
-#define LPC_ODR4             0x098
-#define LPC_STR4             0x09C
+#define LPC_LADR4            0x110
+#define LPC_IDR4             0x114
+#define LPC_ODR4             0x118
+#define LPC_STR4             0x11C
 #define     STR4_IBF	     (1 << 1)
 #define     STR4_OBF	     (1 << 0)
 
