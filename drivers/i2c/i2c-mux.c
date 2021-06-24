@@ -27,7 +27,6 @@
 #include <linux/of.h>
 #include <linux/slab.h>
 #include <linux/sysfs.h>
-#include <linux/timer.h>
 
 /* multiplexer per channel data */
 struct i2c_mux_priv {
@@ -40,20 +39,21 @@ struct i2c_mux_priv {
 static void i2c_mux_hold(struct i2c_mux_core *muxc, unsigned long timeout)
 {
 	mutex_lock(&muxc->hold_lock);
-	mod_timer(&muxc->hold_timer, jiffies + timeout);
+	schedule_delayed_work(&muxc->unhold_work, timeout);
 }
 
 static void i2c_mux_unhold(struct i2c_mux_core *muxc)
 {
-	del_timer_sync(&muxc->hold_timer);
+	cancel_delayed_work_sync(&muxc->unhold_work);
 	mutex_unlock(&muxc->hold_lock);
 }
 
-static void i2c_mux_hold_timer_callback(struct timer_list *t)
+static void i2c_mux_unhold_work(struct work_struct *work)
 {
-	struct i2c_mux_core *muxc = from_timer(muxc, t, hold_timer);
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct i2c_mux_core *muxc = container_of(dwork, struct i2c_mux_core,
+						 unhold_work);
 
-	del_timer(&muxc->hold_timer);
 	mutex_unlock(&muxc->hold_lock);
 }
 
@@ -353,7 +353,7 @@ struct i2c_mux_core *i2c_mux_alloc(struct i2c_adapter *parent,
 	muxc->max_adapters = max_adapters;
 
 	mutex_init(&muxc->hold_lock);
-	timer_setup(&muxc->hold_timer, i2c_mux_hold_timer_callback, 0);
+	INIT_DELAYED_WORK(&muxc->unhold_work, i2c_mux_unhold_work);
 
 	return muxc;
 }

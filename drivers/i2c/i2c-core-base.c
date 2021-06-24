@@ -1395,20 +1395,21 @@ EXPORT_SYMBOL_GPL(i2c_handle_smbus_host_notify);
 static void i2c_adapter_hold(struct i2c_adapter *adapter, unsigned long timeout)
 {
 	mutex_lock(&adapter->hold_lock);
-	mod_timer(&adapter->hold_timer, jiffies + timeout);
+	schedule_delayed_work(&adapter->unhold_work, timeout);
 }
 
 static void i2c_adapter_unhold(struct i2c_adapter *adapter)
 {
-	del_timer_sync(&adapter->hold_timer);
+	cancel_delayed_work_sync(&adapter->unhold_work);
 	mutex_unlock(&adapter->hold_lock);
 }
 
-static void i2c_adapter_hold_timer_callback(struct timer_list *t)
+static void i2c_adapter_unhold_work(struct work_struct *work)
 {
-	struct i2c_adapter *adapter = from_timer(adapter, t, hold_timer);
+	struct delayed_work *dwork = to_delayed_work(work);
+	struct i2c_adapter *adapter = container_of(dwork, struct i2c_adapter,
+						   unhold_work);
 
-	del_timer(&adapter->hold_timer);
 	mutex_unlock(&adapter->hold_lock);
 }
 
@@ -1505,7 +1506,7 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
 	mutex_unlock(&core_lock);
 
 	mutex_init(&adap->hold_lock);
-	timer_setup(&adap->hold_timer, i2c_adapter_hold_timer_callback, 0);
+	INIT_DELAYED_WORK(&adap->unhold_work, i2c_adapter_unhold_work);
 
 	return 0;
 
