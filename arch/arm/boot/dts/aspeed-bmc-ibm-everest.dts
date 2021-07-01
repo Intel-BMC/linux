@@ -406,9 +406,9 @@
 		reg = <0x69>;
 	};
 
-	power-supply@6a {
+	power-supply@6d {
 		compatible = "ibm,cffps";
-		reg = <0x6a>;
+		reg = <0x6d>;
 	};
 
 	power-supply@6b {
@@ -2832,6 +2832,7 @@
 
 &emmc {
 	status = "okay";
+	clk-phase-mmc-hs200 = <180>, <180>;
 };
 
 &fsim0 {
@@ -4049,11 +4050,6 @@
 	memory-region = <&flash_memory>;
 };
 
-&kcs4 {
-	compatible = "openbmc,mctp-lpc";
-	status = "okay";
-};
-
 &mac2 {
 	status = "okay";
 	pinctrl-names = "default";
@@ -4091,4 +4087,15 @@
 &xdma {
 	status = "okay";
 	memory-region = <&vga_memory>;
+};
+
+&kcs2 {
+	status = "okay";
+	aspeed,lpc-io-reg = <0xca8 0xcac>;
+};
+
+&kcs3 {
+	status = "okay";
+	aspeed,lpc-io-reg = <0xca2>;
+	aspeed,lpc-interrupts = <11 IRQ_TYPE_LEVEL_LOW>;
 };
