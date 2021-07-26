@@ -896,10 +896,13 @@ static u32 aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 		irq_handled |= (irq_status & ASPEED_I2CD_INTR_MASTER_ERRORS);
 		if (bus->master_state != ASPEED_I2C_MASTER_INACTIVE) {
 			bus->cmd_err = ret;
-			bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
+			if (bus->master_state == ASPEED_I2C_MASTER_STOP)
+				irq_handled |= (irq_status &
+				                ASPEED_I2CD_INTR_NORMAL_STOP);
 			if (ret == -EAGAIN)
 				irq_handled |= (irq_status &
 						ASPEED_I2CD_INTR_TX_ACK);
+			bus->master_state = ASPEED_I2C_MASTER_INACTIVE;
 			goto out_complete;
 		}
 	}
@@ -1098,9 +1101,14 @@ static irqreturn_t aspeed_i2c_bus_irq(int irq, void *dev_id)
 	} else {
 		irq_handled = aspeed_i2c_slave_irq(bus, irq_remaining);
 		irq_remaining &= ~irq_handled;
-		if (irq_remaining)
+		if (irq_remaining) {
 			irq_handled |= aspeed_i2c_master_irq(bus,
 							     irq_remaining);
+			if (bus->master_state == ASPEED_I2C_MASTER_INACTIVE &&
+			    bus->slave_state == ASPEED_I2C_SLAVE_INACTIVE)
+				irq_handled |= (irq_remaining &
+						ASPEED_I2CD_INTR_NORMAL_STOP);
+		}
 	}
 
 	/*
