@@ -490,6 +490,11 @@
 	multi-master;
 	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
+
+	rtc-pch@44 {
+		compatible = "rtc,pchc620";
+		reg = <0x44>;
+	};
 };
 
 &i2c12 {
