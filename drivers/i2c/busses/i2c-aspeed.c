@@ -245,9 +245,12 @@ static int dump_debug_bus_id __read_mostly;
 	do { \
 		if (dump_debug && (bus)->adap.nr == dump_debug_bus_id) { \
 			char dump_info[100] = {0,}; \
+			char task_info[TASK_COMM_LEN]; \
+			get_task_comm(task_info, current); \
 			snprintf(dump_info, sizeof(dump_info), \
-				 "bus_id:%d, addr:0x%02x, flags:0x%02x: ", \
-				 (bus)->adap.nr, addr, flags); \
+				 "bus_id:%d, addr:0x%02x, flags:0x%02x, task:%s(%d): ", \
+				 (bus)->adap.nr, addr, flags, task_info, \
+				 task_pid_nr(current)); \
 			print_hex_dump(KERN_ERR, dump_info, DUMP_PREFIX_NONE, \
 				       16, 1, buf, len, true); \
 		} \
