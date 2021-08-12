@@ -47,6 +47,7 @@
 #define  LPC_ONCTL_EN_GPIO_OUTPUT	BIT(13)
 #define  LPC_ONCTL_EN_GPIO_MODE		BIT(12)
 #define  LPC_BMC_TRIG_WAKEUP_EVT	BIT(6)
+#define  LPC_BMC_TRIG_SMI_EVT_EN	BIT(0)
 
 #define AST_LPC_SWCR0F0C		0x0C
 #define AST_LPC_SWCR1310		0x10
@@ -255,6 +256,34 @@ static void sio_set_bmc_sci_event(struct aspeed_lpc_sio *lpc_sio,
 	sio_data->data = sio_data->param;
 }
 
+static void sio_set_bmc_smi_event(struct aspeed_lpc_sio *lpc_sio,
+				  struct sio_ioctl_data *sio_data)
+{
+	u32 reg;
+
+	if (sio_data->param) {
+		reg = lpc_sio->reg_base + AST_LPC_SWCR0704;
+		regmap_write_bits(lpc_sio->regmap, reg,
+				  LPC_BMC_TRIG_WAKEUP_EVT_EN,
+				  LPC_BMC_TRIG_WAKEUP_EVT_EN);
+
+		reg = lpc_sio->reg_base + AST_LPC_SWCR0B08;
+		regmap_write_bits(lpc_sio->regmap, reg,
+				  LPC_BMC_TRIG_SMI_EVT_EN,
+				  LPC_BMC_TRIG_SMI_EVT_EN);
+		regmap_write_bits(lpc_sio->regmap, reg,
+				  LPC_BMC_TRIG_WAKEUP_EVT,
+				  LPC_BMC_TRIG_WAKEUP_EVT);
+	} else {
+		reg = lpc_sio->reg_base + AST_LPC_SWCR0300;
+		regmap_write_bits(lpc_sio->regmap, reg,
+				  LPC_BMC_TRIG_WAKEUP_EVT_STS,
+				  LPC_BMC_TRIG_WAKEUP_EVT_STS);
+	}
+
+	sio_data->data = sio_data->param;
+}
+
 typedef void (*sio_cmd_fn) (struct aspeed_lpc_sio *sio_dev,
 			    struct sio_ioctl_data *sio_data);
 
@@ -266,6 +295,7 @@ static sio_cmd_fn sio_cmd_handle[SIO_MAX_CMD] = {
 	[SIO_GET_PWRBTN_OVERRIDE]	= sio_get_pwrbtn_override,
 	[SIO_GET_PFAIL_STATUS]		= sio_get_pfail_status,
 	[SIO_SET_BMC_SCI_EVENT]		= sio_set_bmc_sci_event,
+	[SIO_SET_BMC_SMI_EVENT]		= sio_set_bmc_smi_event,
 };
 
 static long aspeed_lpc_sio_ioctl(struct file *file, unsigned int cmd,
