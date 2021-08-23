@@ -274,20 +274,6 @@
 				#interrupt-cells = <2>;
 			};
 
-			sgpio: sgpio@1e780200 {
-				#gpio-cells = <2>;
-				gpio-controller;
-				compatible = "aspeed,ast2400-sgpio";
-				reg = <0x1e780200 0x0100>;
-				interrupts = <40>;
-				interrupt-controller;
-				clocks = <&syscon ASPEED_CLK_APB>;
-				bus-frequency = <1000000>;
-				pinctrl-names = "default";
-				pinctrl-0 = <&pinctrl_sgpm_default>;
-				status = "disabled";
-			};
-
 			timer: timer@1e782000 {
 				/* This timer is a Faraday FTTMR010 derivative */
 				compatible = "aspeed,ast2400-timer";
@@ -1274,14 +1260,44 @@
 		groups = "SD2";
 	};
 
-	pinctrl_sgpm_default: sgpm_default {
-		function = "SGPM";
-		groups = "SGPM";
+	pinctrl_sgpmck_default: sgpmck_default {
+		function = "SGPMCK";
+		groups = "SGPMCK";
 	};
 
-	pinctrl_sgps_default: sgps_default {
-		function = "SGPS";
-		groups = "SGPS";
+	pinctrl_sgpmi_default: sgpmi_default {
+		function = "SGPMI";
+		groups = "SGPMI";
+	};
+
+	pinctrl_sgpmld_default: sgpmld_default {
+		function = "SGPMLD";
+		groups = "SGPMLD";
+	};
+
+	pinctrl_sgpmo_default: sgpmo_default {
+		function = "SGPMO";
+		groups = "SGPMO";
+	};
+
+	pinctrl_sgpsck_default: sgpsck_default {
+		function = "SGPSCK";
+		groups = "SGPSCK";
+	};
+
+	pinctrl_sgpsi0_default: sgpsi0_default {
+		function = "SGPSI0";
+		groups = "SGPSI0";
+	};
+
+	pinctrl_sgpsi1_default: sgpsi1_default {
+		function = "SGPSI1";
+		groups = "SGPSI1";
+	};
+
+	pinctrl_sgpsld_default: sgpsld_default {
+		function = "SGPSLD";
+		groups = "SGPSLD";
 	};
 
 	pinctrl_sioonctrl_default: sioonctrl_default {

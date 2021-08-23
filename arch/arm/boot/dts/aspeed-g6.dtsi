@@ -472,21 +472,6 @@
 				#interrupt-cells = <2>;
 			};
 
-			sgpio: sgpio@1e780500 {
-				#gpio-cells = <2>;
-				gpio-controller;
-				compatible = "aspeed,ast2600-sgpio";
-				reg = <0x1e780500 0x0100>;
-				#interrupt-cells = <2>;
-				interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-				interrupt-controller;
-				bus-frequency = <1000000>;
-				pinctrl-names = "default";
-				pinctrl-0 = <&pinctrl_sgpm1_default>;
-				clocks = <&syscon ASPEED_CLK_APB1>;
-				status = "disabled";
-			};
-
 			rtc: rtc@1e781000 {
 				compatible = "aspeed,ast2600-rtc";
 				reg = <0x1e781000 0x18>;
