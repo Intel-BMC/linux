@@ -157,14 +157,6 @@ config GPIO_ASPEED_SGPIO
 	help
 	  Say Y here to support Aspeed AST2500 SGPIO functionality.
 
-config SGPIO_ASPEED
-	tristate "ASPEED SGPIO support"
-	depends on (ARCH_ASPEED || COMPILE_TEST) && OF_GPIO
-	select GPIO_GENERIC
-	select GPIOLIB_IRQCHIP
-	help
-	  Say Y here to support ASPEED SGPIO functionality.
-
 config GPIO_ATH79
 	tristate "Atheros AR71XX/AR724X/AR913X GPIO support"
 	default y if ATH79
