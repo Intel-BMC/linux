@@ -280,7 +280,7 @@
 &sio_regs {
 	status = "okay";
 	sio_status {
-		offset = <0x8C>;
+		offset = <0x10C>;
 		bit-mask = <0x1F>;
 		bit-shift = <4>;
 	};
