@@ -164,6 +164,34 @@
 
 	misc_control {
 		compatible = "aspeed,bmc-misc";
+		uart_port_debug {
+			offset = <0xc8>;
+			bit-mask = <0x1>;
+			bit-shift = <1>;
+			read-only;
+		};
+
+		uart1_port_debug {
+			offset = <0xd8>;
+			bit-mask = <0x1>;
+			bit-shift = <3>;
+			read-only;
+		};
+
+		p2a-bridge {
+			offset = <0xC20>;
+			bit-mask = <0x1>;
+			bit-shift = <1>;
+			read-only;
+		};
+
+		boot-2nd-flash {
+			offset = <0x500>;
+			bit-mask = <0x1>;
+			bit-shift = <31>;
+			read-only;
+		};
+
 		chip_id {
 			offset = <0x5b0>;
 			bit-mask = <0xffffffff 0xffffffff>;
@@ -172,6 +200,7 @@
 			reg-width = <64>;
 			hash-data = "d44f9b804976fa23c2e25d62f16154d26520a7e24c5555095fd1b55c027804f1570dcd16189739c640cd7d9a6ce14944a2c4eaf1dc429eed6940e8a83498a474";
 		};
+
 		silicon_id {
 			offset = <0x14>;
 			bit-mask = <0xffffffff>;
