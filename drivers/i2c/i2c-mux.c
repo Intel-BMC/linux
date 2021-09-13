@@ -88,7 +88,7 @@ static int __i2c_mux_master_xfer(struct i2c_adapter *adap,
 			i2c_mux_unhold(muxc);
 		else
 			mutex_unlock(&muxc->hold_lock);
-	} else if (hold_msg == I2C_HOLD_MSG_SET && ret) {
+	} else if (hold_msg == I2C_HOLD_MSG_SET && ret < 0) {
 		i2c_mux_unhold(muxc);
 	}
 

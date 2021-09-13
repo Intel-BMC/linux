@@ -2122,7 +2122,7 @@ int __i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 	}
 
 	if (!i2c_parent_is_i2c_adapter(adap)) {
-		if (hold_msg == I2C_HOLD_MSG_SET && ret)
+		if (hold_msg == I2C_HOLD_MSG_SET && ret < 0)
 			i2c_adapter_unhold(adap);
 		else if (hold_msg == I2C_HOLD_MSG_NONE)
 			mutex_unlock(&adap->hold_lock);
