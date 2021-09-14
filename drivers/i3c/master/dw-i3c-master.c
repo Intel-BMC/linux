@@ -21,7 +21,6 @@
 #include <linux/reset.h>
 #include <linux/slab.h>
 
-//#define IBI_WIP
 #define CCC_WORKAROUND
 #define DEVICE_CTRL			0x0
 #define DEV_CTRL_ENABLE			BIT(31)
@@ -135,14 +134,8 @@
 					INTR_IBI_THLD_STAT |		\
 					INTR_TX_THLD_STAT |		\
 					INTR_RX_THLD_STAT)
-#ifdef IBI_WIP
-#define INTR_MASTER_MASK		(INTR_TRANSFER_ERR_STAT |	\
-					 INTR_RESP_READY_STAT	|	\
-					 INTR_IBI_THLD_STAT)
-#else
 #define INTR_MASTER_MASK		(INTR_TRANSFER_ERR_STAT |	\
 					 INTR_RESP_READY_STAT)
-#endif
 
 #define QUEUE_STATUS_LEVEL		0x4c
 #define QUEUE_STATUS_IBI_STATUS_CNT(x)	(((x) & GENMASK(28, 24)) >> 24)
@@ -200,14 +193,7 @@
 #define SLAVE_CONFIG			0xec
 
 #define DEV_ADDR_TABLE_LEGACY_I2C_DEV	BIT(31)
-#ifdef IBI_WIP
-#define DEV_ADDR_TABLE_IBI_WITH_DATA	BIT(12)
-#define DEV_ADDR_TABLE_IBI_PEC_EN	BIT(11)
-#define DEV_ADDR_TABLE_DYNAMIC_ADDR(x)                                         \
-	((((x) << 16) & GENMASK(23, 16)) | DEV_ADDR_TABLE_IBI_WITH_DATA)
-#else
 #define DEV_ADDR_TABLE_DYNAMIC_ADDR(x)	(((x) << 16) & GENMASK(23, 16))
-#endif
 #define DEV_ADDR_TABLE_STATIC_ADDR(x)	((x) & GENMASK(6, 0))
 #define DEV_ADDR_TABLE_LOC(start, idx)	((start) + ((idx) << 2))
 
@@ -484,27 +470,6 @@ static void dw_i3c_master_end_xfer_locked(struct dw_i3c_master *master, u32 isr)
 	int i, ret = 0;
 	u32 nresp;
 
-#ifdef IBI_WIP
-	int j = 0;
-	u32 nibi;
-
-	/* consume the IBI data */
-	nibi = readl(master->regs + QUEUE_STATUS_LEVEL);
-	nibi = QUEUE_STATUS_IBI_BUF_BLR(nibi);
-
-	if ((isr & INTR_IBI_THLD_STAT) && nibi) {
-		u32 ibi;
-
-		for (i = 0; i < nibi; i++) {
-			ibi = readl(master->regs + IBI_QUEUE_DATA);
-			for (j = 0; j < (ibi & 0xff); j += 4)
-				dev_dbg(master->dev, "ibi: %08x\n",
-					readl(master->regs + IBI_QUEUE_DATA));
-		}
-		writel(RESET_CTRL_IBI_QUEUE, master->regs + RESET_CTRL);
-	}
-#endif
-
 	if (!xfer)
 		return;
 
@@ -738,20 +703,8 @@ static int dw_i3c_master_bus_init(struct i3c_master_controller *m)
 	if (ret)
 		return ret;
 
-#ifdef IBI_WIP
-	thld_ctrl = readl(master->regs + QUEUE_THLD_CTRL);
-	thld_ctrl &=
-		~(QUEUE_THLD_CTRL_IBI_STA_MASK | QUEUE_THLD_CTRL_IBI_DAT_MASK);
-	thld_ctrl |= QUEUE_THLD_CTRL_IBI_STA(1);
-	thld_ctrl |= QUEUE_THLD_CTRL_IBI_DAT(1);
-	writel(thld_ctrl, master->regs + QUEUE_THLD_CTRL);
-
-	writel(0, master->regs + IBI_SIR_REQ_REJECT);
-	writel(0, master->regs + IBI_MR_REQ_REJECT);
-#else
 	writel(IBI_REQ_REJECT_ALL, master->regs + IBI_SIR_REQ_REJECT);
 	writel(IBI_REQ_REJECT_ALL, master->regs + IBI_MR_REQ_REJECT);
-#endif
 
 	/* For now don't support Hot-Join */
 	writel(readl(master->regs + DEVICE_CTRL) | DEV_CTRL_HOT_JOIN_NACK,
