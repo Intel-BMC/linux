@@ -1140,7 +1140,6 @@ static int __init aspeed_gpio_probe(struct platform_device *pdev)
 {
 	const struct of_device_id *gpio_id;
 	struct aspeed_gpio *gpio;
-	struct pinctrl *pinctrl;
 	int rc, i, banks, err;
 	u32 ngpio;
 
@@ -1189,15 +1188,6 @@ static int __init aspeed_gpio_probe(struct platform_device *pdev)
 				    banks, sizeof(u32), GFP_KERNEL);
 	if (!gpio->dcache)
 		return -ENOMEM;
-
-	/*
-	 * Select the pass-through pinctrl config to enable the pass-through
-	 * mux for GPIOs marked as pass-through. Then call pinctrl_put() to
-	 * release claim of the GPIO pins, so they can be requested at runtime.
-	 */
-	pinctrl = pinctrl_get_select(&pdev->dev, "pass-through");
-	if (!IS_ERR(pinctrl))
-		pinctrl_put(pinctrl);
 
 	/*
 	 * Populate it with initial values read from the HW and switch

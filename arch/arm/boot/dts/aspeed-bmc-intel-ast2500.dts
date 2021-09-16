@@ -201,10 +201,6 @@
 
 &gpio {
 	status = "okay";
-	/* Enable GPIOE0 and GPIOE2 pass-through by default */
-	pinctrl-names = "pass-through";
-	pinctrl-0 = <&pinctrl_gpie0_default
-			&pinctrl_gpie2_default>;
 	gpio-line-names =
 	/*A0-A7*/	"","","","","","","","",
 	/*B0-B7*/	"FM_BMC_BOARD_SKU_ID0_N","FM_BMC_BOARD_SKU_ID1_N","FM_BMC_BOARD_SKU_ID2_N","FM_BMC_BOARD_SKU_ID3_N","FM_BMC_BOARD_SKU_ID4_N","","","",
