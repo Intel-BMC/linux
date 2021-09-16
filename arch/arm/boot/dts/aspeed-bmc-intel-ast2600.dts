@@ -245,10 +245,6 @@
 #endif
 &gpio0 {
 	status = "okay";
-	/* Enable GPIOP0 and GPIOP2 pass-through by default */
-	/* pinctrl-names = "pass-through";
-	pinctrl-0 = <&pinctrl_thru0_default
-			&pinctrl_thru1_default>; */
 	gpio-line-names =
 	/*A0-A7*/	"","","","","SMB_CPU_PIROM_SCL","SMB_CPU_PIROM_SDA","SMB_IPMB_STBY_LVC3_R_SCL","SMB_IPMB_STBY_LVC3_R_SDA",
 	/*B0-B7*/	"FM_1200VA_OC","NMI_OUT","IRQ_SMB3_M2_ALERT_N","","RGMII_BMC_RMM4_LVC3_R_MDC","RGMII_BMC_RMM4_LVC3_R_MDIO","FM_BMC_BMCINIT_R","FP_ID_LED_N",
