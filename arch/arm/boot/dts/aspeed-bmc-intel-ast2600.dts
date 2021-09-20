@@ -445,12 +445,14 @@
 &i2c0 {
 	/* SMB_CHASSENSOR_STBY_LVC3 */
 	multi-master;
+	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
 };
 
 &i2c4 {
 	/* SMB_HSBP_STBY_LVC3_R */
 	multi-master;
+	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
 };
 
@@ -458,12 +460,14 @@
 	/* SMB_SMLINK0_STBY_LVC3_R2 */
 	bus-frequency = <1000000>;
 	multi-master;
+	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
 };
 
 &i2c6 {
 	/* SMB_TEMPSENSOR_STBY_LVC3_R */
 	multi-master;
+	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
 };
 
@@ -471,30 +475,35 @@
 	/* SMB_PMBUS_SML1_STBY_LVC3_R */
 	multi-master;
 	#retries = <3>;
+	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
 };
 
 &i2c8 {
 	/* SMB_PCIE_STBY_LVC3_R */
 	multi-master;
+	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
 };
 
 &i2c9 {
 	/* SMB_HOST_STBY_BMC_LVC3_R */
 	multi-master;
+	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
 };
 
 &i2c12 {
 	/* SMB_CPU_PIROM */
 	multi-master;
+	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
 };
 
 &i2c13 {
 	/* SMB_IPMB_STBY_LVC3_R */
 	multi-master;
+	aspeed,hw-timeout-ms = <300>;
 	status = "okay";
 };
 
