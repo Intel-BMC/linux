@@ -380,10 +380,14 @@
 };
 
 &adc0 {
+	aspeed,int-vref-microvolt = <2500000>;
+	aspeed,battery-sensing;
 	status = "okay";
 };
 
 &adc1 {
+	aspeed,int-vref-microvolt = <2500000>;
+	aspeed,battery-sensing;
 	status = "okay";
 };
 
