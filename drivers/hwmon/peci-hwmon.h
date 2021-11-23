@@ -27,6 +27,7 @@ struct peci_sensor_data {
 		u32 uvalue;
 	};
 	ulong last_updated;
+	struct mutex lock; /* protect sensor access */
 };
 
 /**
