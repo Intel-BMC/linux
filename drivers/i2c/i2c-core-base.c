@@ -1570,8 +1570,10 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
 	adap->locked_flags = 0;
 	rt_mutex_init(&adap->bus_lock);
 	rt_mutex_init(&adap->mux_lock);
+	mutex_init(&adap->hold_lock);
 	mutex_init(&adap->userspace_clients_lock);
 	INIT_LIST_HEAD(&adap->userspace_clients);
+	INIT_DELAYED_WORK(&adap->unhold_work, i2c_adapter_unhold_work);
 
 	/* Set default timeout to 1 second if not already set */
 	if (adap->timeout == 0) {
@@ -1635,9 +1637,6 @@ static int i2c_register_adapter(struct i2c_adapter *adap)
 	mutex_lock(&core_lock);
 	bus_for_each_drv(&i2c_bus_type, NULL, adap, __process_new_adapter);
 	mutex_unlock(&core_lock);
-
-	mutex_init(&adap->hold_lock);
-	INIT_DELAYED_WORK(&adap->unhold_work, i2c_adapter_unhold_work);
 
 	return 0;
 
