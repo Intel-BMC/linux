@@ -83,6 +83,10 @@ static struct syscon *of_syscon_register(struct device_node *np, bool check_clk)
 	if (ret)
 		reg_io_width = 4;
 
+	if (of_device_is_compatible(np, "aspeed,ast2500-scu") ||
+	    of_device_is_compatible(np, "aspeed,ast2600-scu"))
+		syscon_config.use_raw_spinlock = true;
+
 	ret = of_hwspin_lock_get_id(np, 0);
 	if (ret > 0 || (IS_ENABLED(CONFIG_HWSPINLOCK) && ret == 0)) {
 		syscon_config.use_hwlock = true;
