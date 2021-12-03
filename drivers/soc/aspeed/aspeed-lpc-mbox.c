@@ -17,8 +17,6 @@
 
 #define DEVICE_NAME	"aspeed-mbox"
 
-#define MBX_USE_INTERRUPT 1
-
 #define   ASPEED_MBOX_CTRL_RECV BIT(7)
 #define   ASPEED_MBOX_CTRL_MASK BIT(1)
 #define   ASPEED_MBOX_CTRL_SEND BIT(0)
@@ -118,26 +116,22 @@ static void put_fifo_with_discard(struct aspeed_mbox *mbox, u8 val)
 
 static int aspeed_mbox_open(struct inode *inode, struct file *file)
 {
-#if MBX_USE_INTERRUPT
 	struct aspeed_mbox *mbox = file_mbox(file);
 	int i;
-#endif
 
 	if (atomic_inc_return(&aspeed_mbox_open_count) == 1) {
-#if MBX_USE_INTERRUPT
 		/*
 		 * Reset the FIFO while opening to clear the old cached data
 		 * and load the FIFO with latest mailbox register values.
 		 */
-		kfifo_reset(&mbox->fifo);
 		spin_lock_irq(&mbox->lock);
+		kfifo_reset(&mbox->fifo);
 		for (i = 0; i < mbox->configs.num_regs; i++) {
 			put_fifo_with_discard(mbox,
 					aspeed_mbox_inb(mbox, mbox->configs.data_offset + (i * 4)));
 		}
 		spin_unlock_irq(&mbox->lock);
 
-#endif
 		return 0;
 	}
 
@@ -149,10 +143,9 @@ static ssize_t aspeed_mbox_read(struct file *file, char __user *buf,
 				size_t count, loff_t *ppos)
 {
 	struct aspeed_mbox *mbox = file_mbox(file);
+	unsigned int copied = 0;
 	char __user *p = buf;
 	ssize_t ret;
-	unsigned int copied;
-	unsigned long flags;
 	int i;
 
 	if (!access_ok(buf, count))
@@ -161,50 +154,47 @@ static ssize_t aspeed_mbox_read(struct file *file, char __user *buf,
 	if (count + *ppos > mbox->configs.num_regs)
 		return -EINVAL;
 
-#if MBX_USE_INTERRUPT
-	/*
-	 * Restrict count as per the number of mailbox registers
-	 * to use kfifo.
-	 */
-	if (count != mbox->configs.num_regs)
-		goto reg_read;
+	/* Restrict count as per the number of mailbox registers to use kfifo. */
+	if (count != mbox->configs.num_regs) {
+		mutex_lock(&mbox->mutex);
+		for (i = *ppos; count > 0 && i < mbox->configs.num_regs; i++) {
+			u8 reg = aspeed_mbox_inb(mbox, mbox->configs.data_offset + (i * 4));
 
-	if (kfifo_is_empty(&mbox->fifo)) {
-		if (file->f_flags & O_NONBLOCK){
-			return -EAGAIN;
-			}
-		ret = wait_event_interruptible(mbox->queue,
-				!kfifo_is_empty(&mbox->fifo));
-		if (ret == -ERESTARTSYS){
-			return -EINTR;
-			}
+			ret = __put_user(reg, p);
+			if (ret)
+				goto out_unlock;
+
+			p++;
+			count--;
+		}
+		mutex_unlock(&mbox->mutex);
+		return p - buf;
 	}
 
-	spin_lock_irqsave(&mbox->lock, flags);
-	ret = kfifo_to_user(&mbox->fifo, buf, count, &copied);
-	spin_unlock_irqrestore(&mbox->lock, flags);
-	return ret ? ret : copied;
-
-#endif
-
-reg_read:
 	mutex_lock(&mbox->mutex);
-
-	for (i = *ppos; count > 0 && i < mbox->configs.num_regs; i++) {
-		uint8_t reg = aspeed_mbox_inb(mbox, mbox->configs.data_offset + (i * 4));
-
-		ret = __put_user(reg, p);
-		if (ret)
+	if (kfifo_is_empty(&mbox->fifo)) {
+		if (file->f_flags & O_NONBLOCK) {
+			ret = -EAGAIN;
 			goto out_unlock;
+		}
 
-		p++;
-		count--;
+		ret = wait_event_interruptible(mbox->queue, !kfifo_is_empty(&mbox->fifo));
+		if (ret == -ERESTARTSYS) {
+			ret = -EINTR;
+			goto out_unlock;
+		}
 	}
-	ret = p - buf;
+
+	/*
+	 * Kfifo allows single reader to access the kfifo concurrently with
+	 * single writer, which means that we only need to serialize against
+	 * other callers of aspeed_mbox_read.
+	 */
+	ret = kfifo_to_user(&mbox->fifo, buf, count, &copied);
 
 out_unlock:
 	mutex_unlock(&mbox->mutex);
-	return ret;
+	return ret ? ret : copied;
 }
 
 static ssize_t aspeed_mbox_write(struct file *file, const char __user *buf,
@@ -293,7 +283,6 @@ static const struct file_operations aspeed_mbox_fops = {
 static irqreturn_t aspeed_mbox_irq(int irq, void *arg)
 {
 	struct aspeed_mbox *mbox = arg;
-#if MBX_USE_INTERRUPT
 	int i;
 
 	dev_dbg(mbox->miscdev.parent, "BMC_CTRL11: 0x%02x\n",
@@ -313,7 +302,6 @@ static irqreturn_t aspeed_mbox_irq(int irq, void *arg)
 				aspeed_mbox_inb(mbox, mbox->configs.data_offset + (i * 4)));
 	}
 	spin_unlock(&mbox->lock);
-#endif
 
 	/* Clear interrupt status */
 	for (i = 0; i < mbox->configs.num_regs / 8; i++)
