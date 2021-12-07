@@ -19,7 +19,7 @@ enum PECI_DIMMPOWER_SENSOR_TYPES {
 #define PECI_DIMMPOWER_ENERGY_CHANNEL_COUNT	1 /* Supported channels number */
 
 #define PECI_DIMMPOWER_POWER_SENSOR_COUNT	4 /* Supported sensors/readings number */
-#define PECI_DIMMPOWER_ENERGY_SENSOR_COUNT	4 /* Supported sensors/readings number */
+#define PECI_DIMMPOWER_ENERGY_SENSOR_COUNT	1 /* Supported sensors/readings number */
 
 struct peci_dimmpower {
 	struct device *dev;
