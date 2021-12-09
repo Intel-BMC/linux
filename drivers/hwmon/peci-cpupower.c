@@ -93,19 +93,20 @@ peci_cpupower_get_energy_counter(struct peci_cpupower *priv,
 				 struct peci_sensor_data *sensor_data,
 				 ulong update_interval)
 {
-	int ret;
+	int ret = 0;
 
+	mutex_lock(&sensor_data->lock);
 	if (!peci_sensor_need_update_with_time(sensor_data,
 					       update_interval)) {
 		dev_dbg(priv->dev, "skip reading package energy over peci\n");
-		return 0;
+		goto unlock;
 	}
 
 	ret = peci_pcs_read(priv->mgr, PECI_MBX_INDEX_ENERGY_COUNTER,
 			    PECI_PKG_ID_CPU_PACKAGE, &sensor_data->uvalue);
 	if (ret) {
 		dev_dbg(priv->dev, "not able to read package energy\n");
-		return ret;
+		goto unlock;
 	}
 
 	peci_sensor_mark_updated(sensor_data);
@@ -114,6 +115,8 @@ peci_cpupower_get_energy_counter(struct peci_cpupower *priv,
 		"energy counter updated %duJ, jif %lu, HZ is %d jiffies\n",
 		sensor_data->uvalue, sensor_data->last_updated, HZ);
 
+unlock:
+	mutex_unlock(&sensor_data->lock);
 	return ret;
 }
 
@@ -123,27 +126,28 @@ peci_cpupower_get_average_power(void *ctx,
 				struct peci_sensor_data *sensor_data)
 {
 	struct peci_cpupower *priv = (struct peci_cpupower *)ctx;
-	int ret;
+	int ret = 0;
 
+	mutex_lock(&sensor_data->lock);
 	if (!peci_sensor_need_update_with_time(sensor_data,
 					       sensor_conf->update_interval)) {
 		dev_dbg(priv->dev,
 			"skip generating new power value %dmW jif %lu\n",
 			sensor_data->value, jiffies);
-		return 0;
+		goto unlock;
 	}
 
 	ret = peci_cpupower_get_energy_counter(priv, &priv->energy_cache,
 					       sensor_conf->update_interval);
 	if (ret) {
 		dev_dbg(priv->dev, "cannot update energy counter\n");
-		return ret;
+		goto unlock;
 	}
 
 	ret = peci_pcs_get_units(priv->mgr, &priv->units, &priv->units_valid);
 	if (ret) {
 		dev_dbg(priv->dev, "not able to read units\n");
-		return ret;
+		goto unlock;
 	}
 
 	ret = peci_pcs_calc_pwr_from_eng(priv->dev,
@@ -153,7 +157,7 @@ peci_cpupower_get_average_power(void *ctx,
 					 &sensor_data->value);
 	if (ret) {
 		dev_dbg(priv->dev, "power calculation failed\n");
-		return ret;
+		goto unlock;
 	}
 
 	peci_sensor_mark_updated_with_time(sensor_data,
@@ -162,6 +166,8 @@ peci_cpupower_get_average_power(void *ctx,
 	dev_dbg(priv->dev, "average power %dmW, jif %lu, HZ is %d jiffies\n",
 		sensor_data->value, sensor_data->last_updated, HZ);
 
+unlock:
+	mutex_unlock(&sensor_data->lock);
 	return ret;
 }
 
@@ -171,25 +177,26 @@ peci_cpupower_get_power_limit(void *ctx, struct peci_sensor_conf *sensor_conf,
 {
 	struct peci_cpupower *priv = (struct peci_cpupower *)ctx;
 	union peci_package_power_limit_low power_limit;
-	int ret;
+	int ret = 0;
 
+	mutex_lock(&sensor_data->lock);
 	if (!peci_sensor_need_update_with_time(sensor_data,
 					       sensor_conf->update_interval)) {
 		dev_dbg(priv->dev, "skip reading peci, power limit %dmW\n",
 			sensor_data->value);
-		return 0;
+		goto unlock;
 	}
 
 	ret = peci_pcs_get_units(priv->mgr, &priv->units, &priv->units_valid);
 	if (ret) {
 		dev_dbg(priv->dev, "not able to read units\n");
-		return ret;
+		goto unlock;
 	}
 
 	ret = peci_cpupower_read_cpu_pkg_pwr_lim_low(priv->mgr, &power_limit);
 	if (ret) {
 		dev_dbg(priv->dev, "not able to read power limit\n");
-		return ret;
+		goto unlock;
 	}
 
 	peci_sensor_mark_updated(sensor_data);
@@ -200,6 +207,8 @@ peci_cpupower_get_power_limit(void *ctx, struct peci_sensor_conf *sensor_conf,
 		power_limit.bits.pwr_lim_1, priv->units.bits.pwr_unit,
 		sensor_data->value);
 
+unlock:
+	mutex_unlock(&sensor_data->lock);
 	return ret;
 }
 
@@ -300,25 +309,26 @@ peci_cpupower_read_max_power(void *ctx, struct peci_sensor_conf *sensor_conf,
 {
 	struct peci_cpupower *priv = (struct peci_cpupower *)ctx;
 	union peci_package_power_info_low power_info;
-	int ret;
+	int ret = 0;
 
+	mutex_lock(&sensor_data->lock);
 	if (!peci_sensor_need_update_with_time(sensor_data,
 					       sensor_conf->update_interval)) {
 		dev_dbg(priv->dev, "skip reading peci, max power %dmW\n",
 			sensor_data->value);
-		return 0;
+		goto unlock;
 	}
 
 	ret = peci_pcs_get_units(priv->mgr, &priv->units, &priv->units_valid);
 	if (ret) {
 		dev_dbg(priv->dev, "not able to read units\n");
-		return ret;
+		goto unlock;
 	}
 
 	ret = peci_cpupower_read_cpu_pkg_pwr_info_low(priv->mgr, &power_info);
 	if (ret) {
 		dev_dbg(priv->dev, "not able to read package power info\n");
-		return ret;
+		goto unlock;
 	}
 
 	peci_sensor_mark_updated(sensor_data);
@@ -330,6 +340,8 @@ peci_cpupower_read_max_power(void *ctx, struct peci_sensor_conf *sensor_conf,
 		power_info.bits.pkg_tdp, priv->units.bits.pwr_unit,
 		sensor_data->value);
 
+unlock:
+	mutex_unlock(&sensor_data->lock);
 	return ret;
 }
 
@@ -339,25 +351,26 @@ peci_cpupower_read_min_power(void *ctx, struct peci_sensor_conf *sensor_conf,
 {
 	struct peci_cpupower *priv = (struct peci_cpupower *)ctx;
 	union peci_package_power_info_low power_info;
-	int ret;
+	int ret = 0;
 
+	mutex_lock(&sensor_data->lock);
 	if (!peci_sensor_need_update_with_time(sensor_data,
 					       sensor_conf->update_interval)) {
 		dev_dbg(priv->dev, "skip reading peci, min power %dmW\n",
 			sensor_data->value);
-		return 0;
+		goto unlock;
 	}
 
 	ret = peci_pcs_get_units(priv->mgr, &priv->units, &priv->units_valid);
 	if (ret) {
 		dev_dbg(priv->dev, "not able to read units\n");
-		return ret;
+		goto unlock;
 	}
 
 	ret = peci_cpupower_read_cpu_pkg_pwr_info_low(priv->mgr, &power_info);
 	if (ret) {
 		dev_dbg(priv->dev, "not able to read package power info\n");
-		return ret;
+		goto unlock;
 	}
 
 	peci_sensor_mark_updated(sensor_data);
@@ -368,6 +381,8 @@ peci_cpupower_read_min_power(void *ctx, struct peci_sensor_conf *sensor_conf,
 		power_info.bits.pkg_min_pwr, priv->units.bits.pwr_unit,
 		sensor_data->value);
 
+unlock:
+	mutex_unlock(&sensor_data->lock);
 	return ret;
 }
 
@@ -376,27 +391,28 @@ peci_cpupower_read_energy(void *ctx, struct peci_sensor_conf *sensor_conf,
 			  struct peci_sensor_data *sensor_data)
 {
 	struct peci_cpupower *priv = (struct peci_cpupower *)ctx;
-	int ret;
+	int ret = 0;
 
+	mutex_lock(&sensor_data->lock);
 	if (!peci_sensor_need_update_with_time(sensor_data,
 					       sensor_conf->update_interval)) {
 		dev_dbg(priv->dev,
 			"skip generating new energy value %duJ jif %lu\n",
 			sensor_data->value, jiffies);
-		return 0;
+		goto unlock;
 	}
 
 	ret = peci_cpupower_get_energy_counter(priv, &priv->energy_cache,
 					       sensor_conf->update_interval);
 	if (ret) {
 		dev_dbg(priv->dev, "cannot update energy counter\n");
-		return ret;
+		goto unlock;
 	}
 
 	ret = peci_pcs_get_units(priv->mgr, &priv->units, &priv->units_valid);
 	if (ret) {
 		dev_dbg(priv->dev, "not able to read units\n");
-		return ret;
+		goto unlock;
 	}
 
 	ret = peci_pcs_calc_acc_eng(priv->dev,
@@ -407,7 +423,7 @@ peci_cpupower_read_energy(void *ctx, struct peci_sensor_conf *sensor_conf,
 
 	if (ret) {
 		dev_dbg(priv->dev, "cumulative energy calculation failed\n");
-		return ret;
+		goto unlock;
 	}
 
 	peci_sensor_mark_updated_with_time(sensor_data,
@@ -416,6 +432,8 @@ peci_cpupower_read_energy(void *ctx, struct peci_sensor_conf *sensor_conf,
 	dev_dbg(priv->dev, "energy %duJ, jif %lu, HZ is %d jiffies\n",
 		sensor_data->uvalue, sensor_data->last_updated, HZ);
 
+unlock:
+	mutex_unlock(&sensor_data->lock);
 	return 0;
 }
 
@@ -643,6 +661,23 @@ static const struct hwmon_ops peci_cpupower_ops = {
 	.write = peci_cpupower_write,
 };
 
+static void peci_cpupower_sensor_init(struct peci_cpupower *priv)
+{
+	int i, j;
+
+	mutex_init(&priv->energy_cache.lock);
+
+	for (i = 0; i < PECI_CPUPOWER_POWER_CHANNEL_COUNT; i++) {
+		for (j = 0; j < PECI_CPUPOWER_POWER_SENSOR_COUNT; j++)
+			mutex_init(&priv->power_sensor_data_list[i][j].lock);
+	}
+
+	for (i = 0; i < PECI_CPUPOWER_ENERGY_CHANNEL_COUNT; i++) {
+		for (j = 0; j < PECI_CPUPOWER_ENERGY_SENSOR_COUNT; j++)
+			mutex_init(&priv->energy_sensor_data_list[i][j].lock);
+	}
+}
+
 static int peci_cpupower_probe(struct platform_device *pdev)
 {
 	struct peci_client_manager *mgr = dev_get_drvdata(pdev->dev.parent);
@@ -686,6 +721,8 @@ static int peci_cpupower_probe(struct platform_device *pdev)
 
 	priv->chip.ops = &peci_cpupower_ops;
 	priv->chip.info = priv->info;
+
+	peci_cpupower_sensor_init(priv);
 
 	hwmon_dev = devm_hwmon_device_register_with_info(priv->dev, priv->name,
 							 priv, &priv->chip,
