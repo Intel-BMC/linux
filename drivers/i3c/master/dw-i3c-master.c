@@ -1467,7 +1467,6 @@ static void dw_i3c_master_sir_handler(struct dw_i3c_master *master,
 	struct i3c_ibi_slot *slot;
 	struct i3c_dev_desc *dev;
 	u8 *buf;
-	int i;
 
 	dev = dw_get_i3c_dev_by_addr(master, addr);
 	if (!dev) {
@@ -1486,8 +1485,7 @@ static void dw_i3c_master_sir_handler(struct dw_i3c_master *master,
 	memcpy(buf, &ibi_status, sizeof(ibi_status));
 	buf += sizeof(ibi_status);
 
-	for (i = 0; i < (!(length % 4) ? (length / 4) : (length / 4 + 1)); i++)
-		dw_i3c_master_read_ibi_fifo(master, buf, length);
+	dw_i3c_master_read_ibi_fifo(master, buf, length);
 
 	slot->len = length + sizeof(ibi_status);
 
