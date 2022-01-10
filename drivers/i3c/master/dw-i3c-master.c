@@ -146,7 +146,8 @@
 					INTR_TX_THLD_STAT |		\
 					INTR_RX_THLD_STAT)
 #define INTR_MASTER_MASK		(INTR_TRANSFER_ERR_STAT |	\
-					 INTR_RESP_READY_STAT)
+					 INTR_RESP_READY_STAT   |	\
+					 INTR_IBI_THLD_STAT)
 
 #define QUEUE_STATUS_LEVEL		0x4c
 #define QUEUE_STATUS_IBI_STATUS_CNT(x)	(((x) & GENMASK(28, 24)) >> 24)
@@ -200,11 +201,6 @@
 #define BUS_IDLE_TIMING			0xd8
 #define I3C_VER_ID			0xe0
 #define I3C_VER_TYPE			0xe4
-#define I3C_VER_RELEASE_TYPE(x)		(((x) & GENMASK(31, 16)) >> 16)
-#define I3C_VER_RELEASE_VERSION(x)	((x) & GENMASK(15, 0))
-
-#define I3C_LC_RELEASE			0x6c63
-
 #define EXTENDED_CAPABILITY		0xe8
 #define SLAVE_CONFIG			0xec
 
@@ -279,8 +275,8 @@ struct dw_i3c_master {
 	void __iomem *regs;
 	struct reset_control *core_rst;
 	struct clk *core_clk;
-	u32 ver_id;
-	u16 ver_type;
+	char version[5];
+	char type[5];
 	u8 addrs[MAX_DEVS];
 };
 
@@ -708,7 +704,6 @@ static int dw_i3c_master_bus_init(struct i3c_master_controller *m)
 {
 	struct dw_i3c_master *master = to_dw_i3c_master(m);
 	struct i3c_bus *bus = i3c_master_get_bus(m);
-	u32 interrupt_mask = INTR_MASTER_MASK;
 	struct i3c_device_info info = { };
 	u32 thld_ctrl;
 	int ret;
@@ -737,18 +732,15 @@ static int dw_i3c_master_bus_init(struct i3c_master_controller *m)
 	thld_ctrl &= ~DATA_BUFFER_THLD_CTRL_RX_BUF;
 	writel(thld_ctrl, master->regs + DATA_BUFFER_THLD_CTRL);
 
-	if (master->ver_type >= I3C_LC_RELEASE) {
-		thld_ctrl = readl(master->regs + QUEUE_THLD_CTRL);
-		thld_ctrl &= ~(QUEUE_THLD_CTRL_IBI_STA_MASK | QUEUE_THLD_CTRL_IBI_DAT_MASK);
-		thld_ctrl |= QUEUE_THLD_CTRL_IBI_STA(1) | QUEUE_THLD_CTRL_IBI_DAT(1);
-		writel(thld_ctrl, master->regs + QUEUE_THLD_CTRL);
-		interrupt_mask |= INTR_IBI_THLD_STAT;
-	}
-
 	writel(INTR_ALL, master->regs + INTR_STATUS);
-	writel(interrupt_mask, master->regs + INTR_STATUS_EN);
-	writel(interrupt_mask, master->regs + INTR_SIGNAL_EN);
+	writel(INTR_MASTER_MASK, master->regs + INTR_STATUS_EN);
+	writel(INTR_MASTER_MASK, master->regs + INTR_SIGNAL_EN);
 
+	thld_ctrl = readl(master->regs + QUEUE_THLD_CTRL);
+	thld_ctrl &= ~(QUEUE_THLD_CTRL_IBI_STA_MASK | QUEUE_THLD_CTRL_IBI_DAT_MASK);
+	thld_ctrl |= QUEUE_THLD_CTRL_IBI_STA(1);
+	thld_ctrl |= QUEUE_THLD_CTRL_IBI_DAT(1);
+	writel(thld_ctrl, master->regs + QUEUE_THLD_CTRL);
 
 	ret = i3c_master_get_free_addr(m, 0);
 	if (ret < 0)
@@ -1271,9 +1263,6 @@ static int dw_i3c_master_request_ibi(struct i3c_dev_desc *dev,
 	struct dw_i3c_i2c_dev_data *data = i3c_dev_get_master_data(dev);
 	unsigned int i;
 
-	if (master->ver_type < I3C_LC_RELEASE)
-		return -EOPNOTSUPP;
-
 	data->ibi_pool = i3c_generic_ibi_alloc_pool(dev, req);
 	if (IS_ERR(data->ibi_pool))
 		return PTR_ERR(data->ibi_pool);
@@ -1467,6 +1456,7 @@ static void dw_i3c_master_sir_handler(struct dw_i3c_master *master,
 	struct i3c_ibi_slot *slot;
 	struct i3c_dev_desc *dev;
 	u8 *buf;
+	int i;
 
 	dev = dw_get_i3c_dev_by_addr(master, addr);
 	if (!dev) {
@@ -1485,7 +1475,8 @@ static void dw_i3c_master_sir_handler(struct dw_i3c_master *master,
 	memcpy(buf, &ibi_status, sizeof(ibi_status));
 	buf += sizeof(ibi_status);
 
-	dw_i3c_master_read_ibi_fifo(master, buf, length);
+	for (i = 0; i < (!(length % 4) ? (length / 4) : (length / 4 + 1)); i++)
+		dw_i3c_master_read_ibi_fifo(master, buf, length);
 
 	slot->len = length + sizeof(ibi_status);
 
@@ -1581,8 +1572,6 @@ static int dw_i3c_probe(struct platform_device *pdev)
 	if (!master)
 		return -ENOMEM;
 
-	master->dev = &pdev->dev;
-
 	master->regs = devm_platform_ioremap_resource(pdev, 0);
 	if (IS_ERR(master->regs))
 		return PTR_ERR(master->regs);
@@ -1638,9 +1627,6 @@ static int dw_i3c_probe(struct platform_device *pdev)
 			       dev_name(&pdev->dev), master);
 	if (ret)
 		goto err_assert_rst;
-
-	ret = readl(master->regs + I3C_VER_TYPE);
-	master->ver_type = I3C_VER_RELEASE_TYPE(ret);
 
 	ret = i3c_master_register(&master->base, &pdev->dev,
 				  &dw_mipi_i3c_ops, false);
