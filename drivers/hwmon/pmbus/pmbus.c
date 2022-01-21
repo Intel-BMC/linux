@@ -29,6 +29,7 @@ static void pmbus_find_sensor_groups(struct i2c_client *client,
 				     struct pmbus_driver_info *info)
 {
 	int page;
+	int fan_mode;
 
 	/* Sensors detected on page 0 only */
 	if (pmbus_check_word_register(client, 0, PMBUS_READ_VIN))
@@ -47,13 +48,20 @@ static void pmbus_find_sensor_groups(struct i2c_client *client,
 		info->func[0] |= PMBUS_HAVE_FAN12;
 		if (pmbus_check_byte_register(client, 0, PMBUS_STATUS_FAN_12))
 			info->func[0] |= PMBUS_HAVE_STATUS_FAN12;
+		fan_mode = pmbus_read_byte_data(client, page, PMBUS_FAN_CONFIG_12);
+		if ((fan_mode & (PB_FAN_1_RPM | PB_FAN_2_RPM)) != (PB_FAN_1_RPM | PB_FAN_2_RPM))
+			info->func[0] |= PMBUS_HAVE_PWM12;
 	}
 	if (pmbus_check_byte_register(client, 0, PMBUS_FAN_CONFIG_34) &&
 	    pmbus_check_word_register(client, 0, PMBUS_READ_FAN_SPEED_3)) {
 		info->func[0] |= PMBUS_HAVE_FAN34;
 		if (pmbus_check_byte_register(client, 0, PMBUS_STATUS_FAN_34))
 			info->func[0] |= PMBUS_HAVE_STATUS_FAN34;
+		fan_mode = pmbus_read_byte_data(client, page, PMBUS_FAN_CONFIG_34);
+		if ((fan_mode & (PB_FAN_1_RPM | PB_FAN_2_RPM)) != (PB_FAN_1_RPM | PB_FAN_2_RPM))
+			info->func[0] |= PMBUS_HAVE_PWM34;
 	}
+
 	if (pmbus_check_word_register(client, 0, PMBUS_READ_TEMPERATURE_1))
 		info->func[0] |= PMBUS_HAVE_TEMP;
 	if (pmbus_check_word_register(client, 0, PMBUS_READ_TEMPERATURE_2))

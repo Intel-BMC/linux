@@ -241,12 +241,32 @@ int pmbus_write_word_data(struct i2c_client *client, int page, u8 reg,
 }
 EXPORT_SYMBOL_NS_GPL(pmbus_write_word_data, PMBUS);
 
+static int pmbus_update_fan_config(struct i2c_client *client, int page, int id,
+				   u8 config, u8 mask)
+{
+	int from;
+	int rv;
+	u8 to;
+
+	from = pmbus_read_byte_data(client, page, pmbus_fan_config_registers[id]);
+	if (from < 0)
+		return from;
+
+	to = (from & ~mask) | (config & mask);
+	if (to != from) {
+		rv = pmbus_write_byte_data(client, page, pmbus_fan_config_registers[id], to);
+		if (rv < 0)
+			return rv;
+	}
+	return 0;
+}
 
 static int pmbus_write_virt_reg(struct i2c_client *client, int page, int reg,
 				u16 word)
 {
 	int bit;
 	int id;
+	int config;
 	int rv;
 
 	switch (reg) {
@@ -254,6 +274,18 @@ static int pmbus_write_virt_reg(struct i2c_client *client, int page, int reg,
 		id = reg - PMBUS_VIRT_FAN_TARGET_1;
 		bit = pmbus_fan_rpm_mask[id];
 		rv = pmbus_update_fan(client, page, id, bit, bit, word);
+		break;
+	case PMBUS_VIRT_PWM_1 ... PMBUS_VIRT_PWM_4:
+		id = reg - PMBUS_VIRT_PWM_1;
+		bit = pmbus_fan_rpm_mask[id];
+		/* 0 is pwm mode */
+		rv = pmbus_update_fan(client, page, id, 0, bit, word);
+		break;
+	case PMBUS_VIRT_PWM_ENABLE_1 ... PMBUS_VIRT_PWM_ENABLE_4:
+		id = reg - PMBUS_VIRT_PWM_ENABLE_1;
+		bit = pmbus_fan_rpm_mask[id];
+		config = word ? bit : 0;
+		rv = pmbus_update_fan_config(client, page, id, config, bit);
 		break;
 	default:
 		rv = -ENXIO;
@@ -293,8 +325,7 @@ int pmbus_update_fan(struct i2c_client *client, int page, int id,
 	int rv;
 	u8 to;
 
-	from = pmbus_read_byte_data(client, page,
-				    pmbus_fan_config_registers[id]);
+	from = pmbus_read_byte_data(client, page, pmbus_fan_config_registers[id]);
 	if (from < 0)
 		return from;
 
@@ -323,15 +354,38 @@ int pmbus_read_word_data(struct i2c_client *client, int page, int phase, u8 reg)
 }
 EXPORT_SYMBOL_NS_GPL(pmbus_read_word_data, PMBUS);
 
+static int pmbus_get_fan_config(struct i2c_client *client, int page, int id, u8 mask)
+{
+	int from;
+
+	from = pmbus_read_byte_data(client, page, pmbus_fan_config_registers[id]);
+	if (from < 0)
+		return from;
+
+	return from & mask;
+}
+
 static int pmbus_read_virt_reg(struct i2c_client *client, int page, int reg)
 {
 	int rv;
 	int id;
+	int bit;
 
 	switch (reg) {
 	case PMBUS_VIRT_FAN_TARGET_1 ... PMBUS_VIRT_FAN_TARGET_4:
 		id = reg - PMBUS_VIRT_FAN_TARGET_1;
 		rv = pmbus_get_fan_rate_device(client, page, id, rpm);
+		break;
+	case PMBUS_VIRT_PWM_1 ... PMBUS_VIRT_PWM_4:
+		id = reg - PMBUS_VIRT_PWM_1;
+		rv = pmbus_get_fan_rate_device(client, page, id, percent);
+		break;
+	case PMBUS_VIRT_PWM_ENABLE_1 ... PMBUS_VIRT_PWM_ENABLE_4:
+		id = reg - PMBUS_VIRT_PWM_ENABLE_1;
+		bit = pmbus_fan_rpm_mask[id];
+		rv = pmbus_get_fan_config(client, page, id, bit);
+		if (rv >= 0)
+			rv = !rv; /* PWM is enabled when rpm bit is not set (rv = 0) */
 		break;
 	default:
 		rv = -ENXIO;
