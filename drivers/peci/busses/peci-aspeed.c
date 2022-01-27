@@ -165,10 +165,29 @@ static void aspeed_peci_init_regs(struct aspeed_peci *priv)
 static inline int aspeed_peci_check_idle(struct aspeed_peci *priv)
 {
 	u32 cmd_sts = readl(priv->base + ASPEED_PECI_CMD);
+	int ret;
 
-	if (FIELD_GET(ASPEED_PECI_CMD_STS_MASK,
-		      cmd_sts) == ASPEED_PECI_CMD_STS_ADDR_T_NEGO)
+	/*
+	 * Under normal circumstances, we expect to be idle here.
+	 * In case there were any errors/timeouts that led to the situation
+	 * where the hardware is not in idle state - we need to reset and
+	 * reinitialize it to avoid potential controller hang.
+	 */
+	if (FIELD_GET(ASPEED_PECI_CMD_STS_MASK, cmd_sts)) {
+		ret = reset_control_assert(priv->rst);
+		if (ret) {
+			dev_err(priv->dev, "cannot assert reset control\n");
+			return ret;
+		}
+
+		ret = reset_control_deassert(priv->rst);
+		if (ret) {
+			dev_err(priv->dev, "cannot deassert reset control\n");
+			return ret;
+		}
+
 		aspeed_peci_init_regs(priv);
+	}
 
 	return readl_poll_timeout(priv->base + ASPEED_PECI_CMD,
 				  cmd_sts,
