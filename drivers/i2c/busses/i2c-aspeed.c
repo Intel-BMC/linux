@@ -1009,16 +1009,24 @@ static u32 aspeed_i2c_master_irq(struct aspeed_i2c_bus *bus, u32 irq_status)
 		irq_handled |= ASPEED_I2CD_INTR_RX_DONE;
 
 		if (msg->flags & I2C_M_RECV_LEN) {
-			recv_byte = readl(bus->base +
-					ASPEED_I2C_BYTE_BUF_REG) >> 8;
-			if (unlikely(recv_byte > I2C_SMBUS_BLOCK_MAX)) {
+			if (unlikely(bus->buf_index != 0)) {
+				dev_err(bus->dev, "I2C_M_RECV_LEN buf_index is not zero\n");
 				bus->cmd_err = -EPROTO;
 				aspeed_i2c_do_stop(bus);
 				goto out_no_complete;
 			}
+			recv_byte = readl(bus->base + ASPEED_I2C_BYTE_BUF_REG) >> 8;
+			if (unlikely(recv_byte > I2C_SMBUS_BLOCK_MAX)) {
+				dev_err(bus->dev,
+					"I2C_M_RECV_LEN too big %d, truncate to %d\n",
+					recv_byte, I2C_SMBUS_BLOCK_MAX);
+				recv_byte = I2C_SMBUS_BLOCK_MAX;
+			}
 			msg->len = recv_byte + ((msg->flags & I2C_CLIENT_PEC) ?
 						2 : 1);
 			msg->flags &= ~I2C_M_RECV_LEN;
+			msg->buf[0] = recv_byte;
+			bus->buf_index = 1;
 		} else if (msg->len) {
 			aspeed_i2c_master_handle_rx(bus, msg);
 		}
