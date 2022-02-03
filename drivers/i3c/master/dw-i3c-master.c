@@ -194,6 +194,12 @@
 #define SCL_EXT_LCNT_1(x)		((x) & GENMASK(7, 0))
 
 #define SCL_EXT_TERMN_LCNT_TIMING	0xcc
+
+#define SDA_HOLD_SWITCH_DLY_TIMING	0xd0
+#define SDA_TX_HOLD(x)			(((x) << 16) & GENMASK(18, 16))
+#define SDA_TX_HOLD_MIN			1
+#define SDA_TX_HOLD_MAX			7
+
 #define BUS_FREE_TIMING			0xd4
 #define BUS_I3C_MST_FREE(x)		((x) & GENMASK(15, 0))
 
@@ -224,10 +230,18 @@
 #define I3C_BUS_SDR3_SCL_RATE		4000000
 #define I3C_BUS_SDR4_SCL_RATE		2000000
 #define I3C_BUS_I2C_FM_TLOW_MIN_NS	1300
+#define I3C_BUS_I2C_FM_THIGH_MIN_NS	600
 #define I3C_BUS_I2C_FMP_TLOW_MIN_NS	500
-#define I3C_BUS_THIGH_MAX_NS		41
+#define I3C_BUS_I2C_FMP_THIGH_MIN_NS	260
+#define I3C_BUS_I3C_OD_TLOW_MIN_NS	200
+#define I3C_BUS_I3C_OD_THIGH_MAX_NS	41
+#define I3C_BUS_I3C_PP_TLOW_MIN_NS	25
+#define I3C_BUS_I3C_PP_THIGH_MIN_NS	25
 
 #define XFER_TIMEOUT (msecs_to_jiffies(1000))
+
+#define DW_I3C_TIMING_MIN 0x0
+#define DW_I3C_TIMING_MAX 0xffffffff
 
 struct dw_i3c_master_caps {
 	u8 cmdfifodepth;
@@ -278,12 +292,39 @@ struct dw_i3c_master {
 	u32 ver_id;
 	u16 ver_type;
 	u8 addrs[MAX_DEVS];
+
+	/* All parameters are expressed in nanoseconds */
+	struct {
+		u32 i3c_od_scl_freq;
+		u32 i3c_od_scl_low;
+		u32 i3c_od_scl_high;
+		u32 i3c_pp_scl_freq;
+		u32 i3c_pp_scl_low;
+		u32 i3c_pp_scl_high;
+		u32 sda_tx_hold;
+	} timings;
 };
 
 struct dw_i3c_i2c_dev_data {
 	u8 index;
 	s8 ibi;
 	struct i3c_generic_ibi_pool *ibi_pool;
+};
+
+/*
+ * All timing parameters are expressed in nanoseconds.
+ * All frequency parameters are expressed in Hz
+ */
+struct dw_i3c_scl_timing {
+	u32 high;
+	u32 high_min;
+	u32 high_max;
+	u32 low;
+	u32 low_min;
+	u32 low_max;
+	u32 freq;
+	u32 freq_min;
+	u32 freq_max;
 };
 
 static u8 even_parity(u8 p)
@@ -578,11 +619,224 @@ static void dw_i3c_master_end_xfer_locked(struct dw_i3c_master *master, u32 isr)
 	dw_i3c_master_start_xfer_locked(master);
 }
 
+static void _timing_calc_when_no_params(struct dw_i3c_scl_timing *timings, u32 *scl_high,
+					u32 *scl_low, u32 *scl_period_ns)
+{
+	u32 high, low, period;
+
+	period = DIV_ROUND_CLOSEST(1000000000, timings->freq_max);
+	high = clamp(period / 2, timings->high_min, timings->high_max);
+	low = timings->low_min;
+
+	if (period > high) {
+		u32 delta = period - high;
+
+		if (delta > timings->low_max)
+			low = timings->low_max;
+		else if (delta >= timings->low_min)
+			low = delta;
+	}
+
+	*scl_high = high;
+	*scl_low = low;
+	*scl_period_ns = high + low;
+}
+
+static int _timing_calc_when_scl_high(struct dw_i3c_scl_timing *timings, u32 *scl_high,
+				      u32 *scl_low, u32 *scl_period_ns)
+{
+	u32 high, low, period;
+
+	high = timings->high;
+	low = timings->low_min;
+	period = DIV_ROUND_CLOSEST(1000000000, timings->freq_max);
+
+	if (period > high) {
+		u32 delta = period - high;
+
+		if (delta > timings->low_max)
+			low = timings->low_max;
+		else if (delta >= timings->low_min)
+			low = delta;
+	}
+
+	*scl_high = high;
+	*scl_low = low;
+	*scl_period_ns = high + low;
+
+	return 0;
+}
+
+static int _timing_calc_when_scl_low(struct dw_i3c_scl_timing *timings, u32 *scl_high,
+				     u32 *scl_low, u32 *scl_period_ns)
+{
+	u32 high, low, period;
+
+	low = timings->low;
+	high = timings->high_min;
+	period = DIV_ROUND_CLOSEST(1000000000, timings->freq_max);
+
+	if (period > low) {
+		u32 delta = period - low;
+
+		if (delta > timings->high_max)
+			high = timings->high_max;
+		else if (delta >= timings->high_min)
+			high = delta;
+	}
+
+	*scl_high = high;
+	*scl_low = low;
+	*scl_period_ns = high + low;
+
+	return 0;
+}
+
+static int _timing_calc_when_scl_freq(struct dw_i3c_scl_timing *timings, u32 *scl_high,
+				      u32 *scl_low, u32 *scl_period_ns)
+{
+	u32 high, period;
+
+	period = DIV_ROUND_CLOSEST(1000000000, timings->freq);
+	high = clamp(period / 2, timings->high_min, timings->high_max);
+	if (period <= high)
+		return -EINVAL;
+
+	*scl_high = high;
+	*scl_low = period - high;
+	*scl_period_ns = period;
+
+	return 0;
+}
+
+static int _timing_calc_when_scl_high_low(struct dw_i3c_scl_timing *timings, u32 *scl_high,
+					  u32 *scl_low, u32 *scl_period_ns)
+{
+	*scl_high = timings->high;
+	*scl_low = timings->low;
+	*scl_period_ns = *scl_high + *scl_low;
+
+	return 0;
+}
+
+static int _timing_calc_when_scl_high_freq(struct dw_i3c_scl_timing *timings, u32 *scl_high,
+					   u32 *scl_low, u32 *scl_period_ns)
+{
+	*scl_period_ns = DIV_ROUND_CLOSEST(1000000000, timings->freq);
+	*scl_high = timings->high;
+	if (*scl_period_ns <= *scl_high)
+		return -EINVAL;
+
+	*scl_low = *scl_period_ns - *scl_high;
+
+	return 0;
+}
+
+static int _timing_calc_when_scl_low_freq(struct dw_i3c_scl_timing *timings, u32 *scl_high,
+					  u32 *scl_low, u32 *scl_period_ns)
+{
+	*scl_period_ns = DIV_ROUND_CLOSEST(1000000000, timings->freq);
+	*scl_low = timings->low;
+	if (*scl_period_ns <= *scl_low)
+		return -EINVAL;
+
+	*scl_high = *scl_period_ns - *scl_low;
+
+	return 0;
+}
+
+static int _timing_calc_when_all(struct dw_i3c_scl_timing *timings, u32 *scl_high,
+				 u32 *scl_low, u32 *scl_period_ns)
+{
+	*scl_period_ns = DIV_ROUND_CLOSEST(1000000000, timings->freq);
+	*scl_high = timings->high;
+	*scl_low = timings->low;
+
+	return 0;
+}
+
+static int dw_i3c_timing_calc(struct dw_i3c_scl_timing *timings, u32 *scl_high, u32 *scl_low)
+{
+	u32 high = timings->high;
+	u32 low = timings->low;
+	u32 freq = timings->freq;
+	u32 period;
+	int ret = 0;
+
+	if ((high > 0 && (high < timings->high_min || high > timings->high_max)) ||
+	    (low > 0 && (low < timings->low_min || low > timings->low_max)) ||
+	    (freq > 0 && (freq < timings->freq_min || freq > timings->freq_max)))
+		return -EINVAL;
+
+	if (high == 0 && low == 0 && freq == 0)
+		_timing_calc_when_no_params(timings, &high, &low, &period);
+	else if (high > 0 && low == 0 && freq == 0)
+		ret = _timing_calc_when_scl_high(timings, &high, &low, &period);
+	else if (high == 0 && low > 0 && freq == 0)
+		ret = _timing_calc_when_scl_low(timings, &high, &low, &period);
+	else if (high == 0 && low == 0 && freq > 0)
+		ret = _timing_calc_when_scl_freq(timings, &high, &low, &period);
+	else if (high > 0 && low > 0 && freq == 0)
+		ret = _timing_calc_when_scl_high_low(timings, &high, &low, &period);
+	else if (high > 0 && low == 0 && freq > 0)
+		ret = _timing_calc_when_scl_high_freq(timings, &high, &low, &period);
+	else if (high == 0 && low > 0 && freq > 0)
+		ret = _timing_calc_when_scl_low_freq(timings, &high, &low, &period);
+	else
+		ret = _timing_calc_when_all(timings, &high, &low, &period);
+
+	if (ret)
+		return ret;
+
+	if (high < timings->high_min || high > timings->high_max ||
+	    low < timings->low_min || low > timings->low_max)
+		return -EINVAL;
+
+	freq = DIV_ROUND_CLOSEST(1000000000, period);
+	if (freq < timings->freq_min || freq > timings->freq_max)
+		return -EINVAL;
+
+	if ((high + low) != period)
+		return -EINVAL;
+
+	*scl_high = high;
+	*scl_low = low;
+
+	return 0;
+}
+
+static void dw_i3c_timing_calc_cnt(u32 core_rate_hz, u32 high, u32 low, u8 *hcnt, u8 *lcnt)
+{
+	u32 hcnt_tmp, lcnt_tmp;
+	u32 core_period_ns;
+
+	core_period_ns = DIV_ROUND_CLOSEST(1000000000, core_rate_hz);
+	hcnt_tmp = DIV_ROUND_CLOSEST(high, core_period_ns);
+	lcnt_tmp = DIV_ROUND_CLOSEST(low, core_period_ns);
+
+	if (hcnt_tmp < SCL_I3C_TIMING_CNT_MIN)
+		*hcnt = SCL_I3C_TIMING_CNT_MIN;
+	else if (hcnt_tmp > 0xFF)
+		*hcnt = 0xFF;
+	else
+		*hcnt = (u8)hcnt_tmp;
+
+	if (lcnt_tmp < SCL_I3C_TIMING_CNT_MIN)
+		*lcnt = SCL_I3C_TIMING_CNT_MIN;
+	else if (lcnt_tmp > 0xFF)
+		*lcnt = 0xFF;
+	else
+		*lcnt = (u8)lcnt_tmp;
+}
+
 static int dw_i3c_clk_cfg(struct dw_i3c_master *master)
 {
 	unsigned long core_rate, core_period;
+	struct dw_i3c_scl_timing timings;
+	u32 high, low;
 	u32 scl_timing;
 	u8 hcnt, lcnt;
+	int ret;
 
 	core_rate = clk_get_rate(master->core_clk);
 	if (!core_rate)
@@ -590,23 +844,51 @@ static int dw_i3c_clk_cfg(struct dw_i3c_master *master)
 
 	core_period = DIV_ROUND_UP(1000000000, core_rate);
 
-	hcnt = DIV_ROUND_UP(I3C_BUS_THIGH_MAX_NS, core_period) - 1;
-	if (hcnt < SCL_I3C_TIMING_CNT_MIN)
-		hcnt = SCL_I3C_TIMING_CNT_MIN;
+	/* Open-drain clock configuration */
+	timings.high = master->timings.i3c_od_scl_high;
+	timings.high_min = I3C_BUS_I3C_PP_THIGH_MIN_NS;
+	timings.high_max = DW_I3C_TIMING_MAX;
+	timings.low = master->timings.i3c_od_scl_low;
+	timings.low_min = I3C_BUS_I3C_OD_TLOW_MIN_NS;
+	timings.low_max = DW_I3C_TIMING_MAX;
+	timings.freq = master->timings.i3c_od_scl_freq;
+	timings.freq_min = DW_I3C_TIMING_MIN;
+	timings.freq_max = I3C_BUS_TYP_I3C_SCL_RATE;
+	ret = dw_i3c_timing_calc(&timings, &high, &low);
+	if (ret)
+		return ret;
 
-	lcnt = DIV_ROUND_UP(core_rate, I3C_BUS_TYP_I3C_SCL_RATE) - hcnt;
-	if (lcnt < SCL_I3C_TIMING_CNT_MIN)
-		lcnt = SCL_I3C_TIMING_CNT_MIN;
+	dw_i3c_timing_calc_cnt(core_rate, high, low, &hcnt,
+			       &lcnt);
+	scl_timing = SCL_I3C_TIMING_HCNT(hcnt) | SCL_I3C_TIMING_LCNT(lcnt);
+	writel(scl_timing, master->regs + SCL_I3C_OD_TIMING);
 
+	/* SDR0 (push-pull) clock configuration */
+	timings.high = master->timings.i3c_pp_scl_high;
+	timings.high_min = I3C_BUS_I3C_PP_THIGH_MIN_NS;
+	timings.high_max = DW_I3C_TIMING_MAX;
+	timings.low = master->timings.i3c_pp_scl_low;
+	timings.low_min = I3C_BUS_I3C_PP_TLOW_MIN_NS;
+	timings.low_max = DW_I3C_TIMING_MAX;
+	timings.freq = master->timings.i3c_pp_scl_freq;
+	timings.freq_min = DW_I3C_TIMING_MIN;
+	timings.freq_max = I3C_BUS_TYP_I3C_SCL_RATE;
+	ret = dw_i3c_timing_calc(&timings, &high, &low);
+	if (ret)
+		return ret;
+
+	dw_i3c_timing_calc_cnt(core_rate, high, low, &hcnt,
+			       &lcnt);
 	scl_timing = SCL_I3C_TIMING_HCNT(hcnt) | SCL_I3C_TIMING_LCNT(lcnt);
 	writel(scl_timing, master->regs + SCL_I3C_PP_TIMING);
 
 	if (!(readl(master->regs + DEVICE_CTRL) & DEV_CTRL_I2C_SLAVE_PRESENT))
 		writel(BUS_I3C_MST_FREE(lcnt), master->regs + BUS_FREE_TIMING);
 
-	lcnt = DIV_ROUND_UP(I3C_BUS_TLOW_OD_MIN_NS, core_period);
-	scl_timing = SCL_I3C_TIMING_HCNT(hcnt) | SCL_I3C_TIMING_LCNT(lcnt);
-	writel(scl_timing, master->regs + SCL_I3C_OD_TIMING);
+	/* SDR1, SDR2, SDR3, SDR4 (push-pull) clocks configuration */
+	hcnt = DIV_ROUND_UP(I3C_BUS_I3C_OD_THIGH_MAX_NS, core_period) - 1;
+	if (hcnt < SCL_I3C_TIMING_CNT_MIN)
+		hcnt = SCL_I3C_TIMING_CNT_MIN;
 
 	lcnt = DIV_ROUND_UP(core_rate, I3C_BUS_SDR1_SCL_RATE) - hcnt;
 	scl_timing = SCL_EXT_LCNT_1(lcnt);
@@ -652,6 +934,27 @@ static int dw_i2c_clk_cfg(struct dw_i3c_master *master)
 	return 0;
 }
 
+static int dw_sda_tx_hold_cfg(struct dw_i3c_master *master)
+{
+	unsigned long core_rate, core_period;
+	u8 sda_tx_hold;
+
+	/* Do not modify register if there is no DT configuration or 0 was provied */
+	if (!master->timings.sda_tx_hold)
+		return 0;
+
+	core_rate = clk_get_rate(master->core_clk);
+	if (!core_rate)
+		return -EINVAL;
+
+	core_period = DIV_ROUND_UP(1000000000, core_rate);
+	sda_tx_hold = clamp((u32)DIV_ROUND_CLOSEST(master->timings.sda_tx_hold, core_period),
+			    (u32)SDA_TX_HOLD_MIN, (u32)SDA_TX_HOLD_MAX);
+	writel(SDA_TX_HOLD(sda_tx_hold), master->regs + SDA_HOLD_SWITCH_DLY_TIMING);
+
+	return 0;
+}
+
 static int dw_i3c_master_bus_init(struct i3c_master_controller *m)
 {
 	struct dw_i3c_master *master = to_dw_i3c_master(m);
@@ -676,6 +979,10 @@ static int dw_i3c_master_bus_init(struct i3c_master_controller *m)
 	default:
 		return -EINVAL;
 	}
+
+	ret = dw_sda_tx_hold_cfg(master);
+	if (ret)
+		return ret;
 
 	thld_ctrl = readl(master->regs + QUEUE_THLD_CTRL);
 	thld_ctrl &= ~QUEUE_THLD_CTRL_RESP_BUF_MASK;
@@ -1501,6 +1808,48 @@ static irqreturn_t dw_i3c_master_irq_handler(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
+static void dw_i3c_master_of_timings(struct dw_i3c_master *master,
+				     struct device_node *node)
+{
+	u32 val;
+
+	if (!of_property_read_u32(node, "i2c-scl-hz", &val))
+		master->timings.i3c_od_scl_freq = val;
+
+	if (!of_property_read_u32(node, "i3c-od-scl-low-ns", &val)) {
+		if (val < I3C_BUS_I3C_OD_TLOW_MIN_NS)
+			dev_warn(master->dev,
+				 "invalid i3c-od-scl-low-ns: %u, ignoring provided value\n", val);
+		else
+			master->timings.i3c_od_scl_low = val;
+	}
+
+	if (!of_property_read_u32(node, "i3c-od-scl-high-ns", &val))
+		master->timings.i3c_od_scl_high = val;
+
+	if (!of_property_read_u32(node, "i3c-scl-hz", &val))
+		master->timings.i3c_pp_scl_freq = val;
+
+	if (!of_property_read_u32(node, "i3c-pp-scl-low-ns", &val)) {
+		if (val < I3C_BUS_I3C_PP_TLOW_MIN_NS)
+			dev_warn(master->dev,
+				 "invalid i3c-pp-scl-low-ns: %u, ignoring provided value\n", val);
+		else
+			master->timings.i3c_pp_scl_low = val;
+	}
+
+	if (!of_property_read_u32(node, "i3c-pp-scl-high-ns", &val)) {
+		if (val < I3C_BUS_I3C_PP_THIGH_MIN_NS)
+			dev_warn(master->dev,
+				 "invalid i3c-pp-scl-high-ns: %u, ignoring provided value\n", val);
+		else
+			master->timings.i3c_pp_scl_high = val;
+	}
+
+	if (!of_property_read_u32(node, "sda-tx-hold-ns", &val))
+		master->timings.sda_tx_hold = val;
+}
+
 static const struct i3c_master_controller_ops dw_mipi_i3c_ops = {
 	.bus_init = dw_i3c_master_bus_init,
 	.bus_cleanup = dw_i3c_master_bus_cleanup,
@@ -1590,6 +1939,8 @@ static int dw_i3c_probe(struct platform_device *pdev)
 
 	ret = readl(master->regs + I3C_VER_TYPE);
 	master->ver_type = I3C_VER_RELEASE_TYPE(ret);
+
+	dw_i3c_master_of_timings(master, pdev->dev.of_node);
 
 	ret = i3c_master_register(&master->base, &pdev->dev,
 				  &dw_mipi_i3c_ops, false);
