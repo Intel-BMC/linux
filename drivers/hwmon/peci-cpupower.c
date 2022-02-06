@@ -397,8 +397,8 @@ peci_cpupower_read_energy(void *ctx, struct peci_sensor_conf *sensor_conf,
 	if (!peci_sensor_need_update_with_time(sensor_data,
 					       sensor_conf->update_interval)) {
 		dev_dbg(priv->dev,
-			"skip generating new energy value %duJ jif %lu\n",
-			sensor_data->value, jiffies);
+			"skip generating new energy value %uuJ jif %lu\n",
+			sensor_data->uvalue, jiffies);
 		goto unlock;
 	}
 
