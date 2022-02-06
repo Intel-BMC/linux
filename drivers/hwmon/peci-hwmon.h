@@ -462,7 +462,7 @@ static inline int peci_pcs_calc_pwr_from_eng(struct device *dev,
 	elapsed = energy->last_updated - prev_energy->last_updated;
 
 	dev_dbg(dev, "raw energy before %u, raw energy now %u, unit %u, jiffies elapsed %lu\n",
-		prev_energy->value, energy->value, unit, elapsed);
+		prev_energy->uvalue, energy->uvalue, unit, elapsed);
 
 	/*
 	 * TODO: Remove checking current energy value against 0.
@@ -540,7 +540,7 @@ static inline int peci_pcs_calc_acc_eng(struct device *dev,
 	elapsed = curr_energy->last_updated - prev_energy->last_updated;
 
 	dev_dbg(dev, "raw energy before %u, raw energy now %u, unit %u, jiffies elapsed %lu\n",
-		prev_energy->uvalue, curr_energy->value, unit, elapsed);
+		prev_energy->uvalue, curr_energy->uvalue, unit, elapsed);
 
 	/*
 	 * TODO: Remove checking current energy value against 0.
