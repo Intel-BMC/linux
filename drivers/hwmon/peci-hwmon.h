@@ -465,11 +465,20 @@ static inline int peci_pcs_calc_pwr_from_eng(struct device *dev,
 		prev_energy->value, energy->value, unit, elapsed);
 
 	/*
+	 * TODO: Remove checking current energy value against 0.
+	 * During host reset CPU resets its energy counters, hwmon treats such case
+	 * as proper energy read (counter overflow) and calculates invalid
+	 * power consumption. Currently hwmon is unable to determine if CPU was
+	 * reset, stop treating 0 as invalid value when proper mechanism
+	 * is implemented.
+	 *
 	 * Don't calculate average power for first counter read  last counter
 	 * read was more than 60 minutes ago (jiffies did not wrap and power
-	 * calculation does not overflow or underflow).
+	 * calculation does not overflow or underflow) or energy read time
+	 * did not change.
 	 */
-	if (prev_energy->last_updated > 0 && elapsed < (HZ * 3600) && elapsed) {
+	if (energy->uvalue > 0 && prev_energy->last_updated > 0 &&
+	    elapsed < (HZ * 3600) && elapsed) {
 		u32 energy_consumed;
 		u64 energy_consumed_in_mJ;
 		u64 energy_by_jiffies;
@@ -534,11 +543,19 @@ static inline int peci_pcs_calc_acc_eng(struct device *dev,
 		prev_energy->uvalue, curr_energy->value, unit, elapsed);
 
 	/*
+	 * TODO: Remove checking current energy value against 0.
+	 * During host reset CPU resets its energy counters, hwmon treats such case
+	 * as proper energy read (counter overflow) and calculates invalid
+	 * energy increase. Currently hwmon is unable to determine if CPU was
+	 * reset, stop treating 0 as invalid value when proper mechanism
+	 * is implemented.
+	 *
 	 * Don't calculate cumulative energy for first counter read - last counter
 	 * read was more than 17 minutes ago (jiffies and energy raw counter did not wrap
 	 * and power calculation does not overflow or underflow).
 	 */
-	if (prev_energy->last_updated > 0 && elapsed < (HZ * 17 * 60)) {
+	if (curr_energy->uvalue > 0 && prev_energy->last_updated > 0 &&
+	    elapsed < (HZ * 17 * 60)) {
 		u32 energy_consumed;
 		u64 energy_consumed_in_uJ;
 
