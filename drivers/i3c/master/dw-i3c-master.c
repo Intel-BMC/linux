@@ -1323,7 +1323,8 @@ static int dw_i3c_master_enable_ibi(struct i3c_dev_desc *dev)
 	dat_loc = DEV_ADDR_TABLE_LOC(master->datstartaddr, pos);
 	reg = readl(master->regs + dat_loc);
 	reg &= ~DEV_ADDR_TABLE_SIR_REJECT;
-	reg |= DEV_ADDR_TABLE_IBI_WITH_DATA;
+	if (dev->info.bcr & I3C_BCR_IBI_PAYLOAD)
+		reg |= DEV_ADDR_TABLE_IBI_WITH_DATA;
 	writel(reg, master->regs + dat_loc);
 
 	spin_unlock_irq(&master->ibi.lock);
