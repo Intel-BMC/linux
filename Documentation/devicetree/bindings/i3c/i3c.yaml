@@ -55,6 +55,24 @@ properties:
 
       May not be supported by all controllers.
 
+  initial-role:
+    enum:
+      - primary
+      - secondary
+      - target
+    description: |
+      If it is not specified, by default the initial I3C device role will be "primary".
+
+  pid:
+    $ref: '/schemas/types.yaml#/definitions/uint64'
+    description: |
+      Target Device Provisioned ID
+
+  dcr:
+    $ref: '/schemas/types.yaml#/definitions/uint32'
+    description: |
+      Target Device Characteristic Register value
+
 required:
   - "#address-cells"
   - "#size-cells"
