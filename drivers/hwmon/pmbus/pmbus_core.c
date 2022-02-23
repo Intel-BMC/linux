@@ -587,15 +587,6 @@ static int pmbus_get_status(struct i2c_client *client, int page, int reg)
 		break;
 	default:
 		status = _pmbus_read_byte_data(client, page, reg);
-		if (status > 0) {
-			/*
-			 * Status greater than 0 could mean that there was a fault/warning.
-			 * Clear faults and do a second read to make sure we are not getting
-			 * stale values.
-			 */
-			pmbus_clear_fault_page(client, page);
-			status = _pmbus_read_byte_data(client, page, reg);
-		}
 		break;
 	}
 	if (status < 0)
