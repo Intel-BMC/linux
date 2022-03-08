@@ -20,6 +20,21 @@ Documentation/devicetree/bindings/i3c/i3c.yaml for more details):
 - i2c-scl-hz
 - i3c-scl-hz
 
+Optional properties specific for this driver:
+
+- i3c-od-scl-low-ns: SCL low period for Open-Drain phase. Expressed in
+       nanoseconds. It is validated by the driver. Minimum value is 200.
+- i3c-od-scl-high-ns: SCL high period for Open-Drain phase. Expressed in
+       nanoseconds. It is validated by the driver. Minimum value is 25.
+- i3c-pp-scl-low-ns: SCL low period for Push-Pull phase. Expressed in
+       nanoseconds. It is validated by the driver. Minimum value is 25.
+- i3c-pp-scl-high-ns: SCL high period for Push-Pull phase. It is expressed in
+       nanoseconds. It is validated by the driver. Minimum value is 25.
+- sda-tx-hold-ns: SDA Hold Time (Thd_dat). Expressed in nanoseconds. It is not
+       validated by driver. Minimum value is 5. Maximum value is 35. Other
+	   values will be trimmed to the range. This parameter is not supported by
+	   old IP versions.
+
 I3C device connected on the bus follow the generic description (see
 Documentation/devicetree/bindings/i3c/i3c.yaml for more details).
 
