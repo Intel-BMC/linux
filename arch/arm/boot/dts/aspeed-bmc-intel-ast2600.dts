@@ -147,6 +147,10 @@
 
 &espi {
 	status = "okay";
+	reg = <0x1e6ee000 0x1000>;
+	oob,dma-mode;
+	oob,dma-tx-desc-num = <0x2>;
+	oob,dma-rx-desc-num = <0x8>;
 };
 
 &mctp {
