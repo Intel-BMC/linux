@@ -239,6 +239,10 @@
 	status = "okay";
 };
 
+&uhci {
+	status = "okay";
+};
+
 &gpio0 {
 	gpio-line-names =
 	/*A0-A7*/	"","","","","","","","",
@@ -246,7 +250,7 @@
 	/*C0-C7*/	"","","","","","","","",
 	/*D0-D7*/	"","","","","","","","",
 	/*E0-E7*/	"","","","","","","","",
-	/*F0-F7*/	"","","","","","","factory-reset-toggle","",
+	/*F0-F7*/	"","","","reset-cause-pinhole","","","factory-reset-toggle","",
 	/*G0-G7*/	"","","","","","","","",
 	/*H0-H7*/	"","bmc-ingraham0","rear-enc-id0","rear-enc-fault0","","","","",
 	/*I0-I7*/	"","","","","","","bmc-secure-boot","",
@@ -274,6 +278,12 @@
 		gpios = <ASPEED_GPIO(G, 6) GPIO_ACTIVE_LOW>;
 		output-high;
 		line-name = "I2C3_MUX_OE_N";
+	};
+
+	usb_power {
+		gpio-hog;
+		gpios = <ASPEED_GPIO(O, 3) GPIO_ACTIVE_LOW>;
+		output-high;
 	};
 };
 
@@ -2060,6 +2070,11 @@
 
 &i2c12 {
 	status = "okay";
+
+	tpm@2e {
+		compatible = "nuvoton,npct75x";
+		reg = <0x2e>;
+	};
 
 	eeprom@50 {
 		compatible = "atmel,24c64";

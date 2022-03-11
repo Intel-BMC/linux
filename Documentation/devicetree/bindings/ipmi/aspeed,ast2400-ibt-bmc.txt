@@ -9,9 +9,9 @@ Required properties:
 - compatible : should be one of
 	"aspeed,ast2400-ibt-bmc"
 	"aspeed,ast2500-ibt-bmc"
+	"aspeed,ast2600-ibt-bmc"
 - reg: physical address and size of the registers
-- clocks: contains a phandle to the syscon node describing the clocks.
-	  There should then be one cell representing the clock to use.
+- clocks: clock for the device
 
 Optional properties:
 
