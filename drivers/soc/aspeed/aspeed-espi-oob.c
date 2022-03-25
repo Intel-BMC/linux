@@ -98,7 +98,7 @@ static long aspeed_espi_oob_get_rx(struct file *fp,
 	u8 *pkt;
 
 	if (fp->f_flags & O_NONBLOCK) {
-		if (mutex_trylock(&espi_oob->get_rx_mtx))
+		if (!mutex_trylock(&espi_oob->get_rx_mtx))
 			return -EBUSY;
 
 		if (!espi_oob->rx_ready) {
