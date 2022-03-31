@@ -1494,6 +1494,13 @@ static int dw_i3c_master_priv_xfers(struct i3c_dev_desc *dev,
 		dw_i3c_master_dequeue_xfer(master, xfer);
 
 	ret = xfer->ret;
+	if (ret)
+		goto out;
+
+	for (i = 0; i < i3c_nxfers; i++)
+		if (i3c_xfers[i].rnw)
+			i3c_xfers[i].len = xfer->cmds[i].rx_len;
+out:
 	dw_i3c_master_free_xfer(xfer);
 
 	return ret;
