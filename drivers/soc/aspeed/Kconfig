@@ -108,6 +108,13 @@ config ASPEED_VGA_SHAREDMEM
 	  specification, BIOS will transfer whole SMBIOS table to VGA memory,
 	  and BMC can get the table from VGA memory through this driver.
 
+config ASPEED_SBC
+	bool "ASPEED Secure Boot Controller driver"
+	default MACH_ASPEED_G6
+	help
+	  Say yes to provide information about the secure boot controller in
+	  debugfs.
+
 endmenu
 
 endif
