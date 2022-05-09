@@ -20,6 +20,11 @@ properties:
       addresses start from 0x30.
     maxItems: 1
 
+  domain:
+    description: |
+      PECI client Domain ID from 0 to 15.
+    maxItems: 1
+
 examples:
   - |
     #include <dt-bindings/interrupt-controller/arm-gic.h>
@@ -40,14 +45,16 @@ examples:
             resets = <&syscon ASPEED_RESET_PECI>;
             clock-frequency = <24000000>;
 
-            peci-client@30 {
+            peci-client@0 {
                 compatible = "intel,peci-client";
                 reg = <0x30>;
+                domain = <0>;
             };
 
-            peci-client@31 {
+            peci-client@1 {
                 compatible = "intel,peci-client";
                 reg = <0x31>;
+                domain = <0>;
             };
         };
     };
