@@ -36,6 +36,7 @@
 
 #define HW_CAPABILITY			0x8
 #define COMMAND_QUEUE_PORT		0xc
+#define COMMAND_PORT_PEC		BIT(31)
 #define COMMAND_PORT_TOC		BIT(30)
 #define COMMAND_PORT_READ_TRANSFER	BIT(28)
 #define COMMAND_PORT_SDAP		BIT(27)
@@ -1487,6 +1488,9 @@ static int dw_i3c_master_priv_xfers(struct i3c_dev_desc *dev,
 		if (i == (i3c_nxfers - 1))
 			cmd->cmd_lo |= COMMAND_PORT_TOC;
 
+		if (dev->info.pec)
+			cmd->cmd_lo |= COMMAND_PORT_PEC;
+
 		dev_dbg(master->dev,
 			"%s:cmd_hi=0x%08x cmd_lo=0x%08x tx_len=%d rx_len=%d\n",
 			__func__, cmd->cmd_hi, cmd->cmd_lo, cmd->tx_len,
@@ -2188,6 +2192,8 @@ static int dw_i3c_probe(struct platform_device *pdev)
 	master->ver_type = I3C_VER_RELEASE_TYPE(ret);
 
 	dw_i3c_master_of_timings(master, pdev->dev.of_node);
+
+	master->base.pec_supported = true;
 
 	ret = i3c_register(&master->base, &pdev->dev, &dw_mipi_i3c_ops, &dw_mipi_i3c_target_ops,
 			   false);
