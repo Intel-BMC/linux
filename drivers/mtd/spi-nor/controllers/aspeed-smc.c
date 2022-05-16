@@ -1331,7 +1331,7 @@ static int aspeed_smc_setup_flash(struct aspeed_smc_controller *controller,
 					 &spi_tx_width)) {
 			spi_tx_width = 2;
 		}
-		dev_info(dev, "tx width: %ld\n", spi_tx_width);
+		dev_info(dev, "tx width: %u\n", spi_tx_width);
 
 		hwcaps.mask = SNOR_HWCAPS_READ |
 					SNOR_HWCAPS_READ_FAST |
