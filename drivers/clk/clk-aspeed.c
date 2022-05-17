@@ -561,7 +561,7 @@ static int aspeed_clk_probe(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(aspeed_gates); i++) {
 		const struct aspeed_gate_data *gd = &aspeed_gates[i];
 		u32 gate_flags;
-		char *parent_name;
+		const char *parent_name;
 
 		/* For uart, needs to adjust the clock based on SCU4C value */
 		if ((i == ASPEED_CLK_GATE_UART1CLK && (val & UART1_HS_CLK_EN)) ||
