@@ -290,12 +290,13 @@ static int i3c_mctp_probe(struct i3c_device *i3cdev)
 	cdev_init(&priv->cdev, &i3c_mctp_fops);
 
 	priv->cdev.owner = THIS_MODULE;
-	ret = cdev_add(&priv->cdev, i3c_mctp_devt, 1);
+	ret = cdev_add(&priv->cdev, MKDEV(MAJOR(i3c_mctp_devt), priv->id), 1);
 	if (ret)
 		goto error_cdev;
 
 	/* register this i3c device with the driver core */
-	priv->dev = device_create(i3c_mctp_class, dev, i3c_mctp_devt,
+	priv->dev = device_create(i3c_mctp_class, dev,
+				  MKDEV(MAJOR(i3c_mctp_devt), priv->id),
 				  NULL, "i3c-mctp-%d", priv->id);
 	if (IS_ERR(priv->dev)) {
 		ret = PTR_ERR(priv->dev);
@@ -329,7 +330,7 @@ static void i3c_mctp_remove(struct i3c_device *i3cdev)
 	i3c_device_disable_ibi(i3cdev);
 	i3c_device_free_ibi(i3cdev);
 
-	device_destroy(i3c_mctp_class, i3c_mctp_devt);
+	device_destroy(i3c_mctp_class, MKDEV(MAJOR(i3c_mctp_devt), priv->id));
 	cdev_del(&priv->cdev);
 	ida_free(&i3c_mctp_ida, priv->id);
 }
